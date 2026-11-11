@@ -263,3 +263,11 @@ h1,h2,h3,p{margin-top:0}
 @media(max-width:1460px){.studio-layout{grid-template-columns:170px minmax(345px,1fr) 310px;gap:10px}}
 @media(max-width:1180px){.studio-layout{grid-template-columns:180px minmax(0,1fr)}.studio-preview-panel{grid-column:2;min-height:0}.studio-chat{height:640px}.studio-threads{max-height:640px}}
 @media(max-width:760px){.studio-layout{grid-template-columns:1fr}.studio-threads{max-height:148px}.studio-thread-scroll{max-height:70px}.studio-chat{height:640px}.studio-preview-panel{grid-column:auto}.studio-preview-stage{height:440px}}
+
+/* Streamed Agent execution history in the creative studio. */
+.studio-event-panel{background:#17243a;max-width:96%;align-self:flex-start;border-color:#35435c}
+.studio-event-row{padding:5px 0;border-bottom:1px solid #293851}
+.studio-event-row:last-child{border-bottom:0}
+.studio-reasoning{margin-top:12px;padding:10px 0;border-top:1px solid #344158;color:#b9c7de}
+.studio-reasoning summary{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:#b8aaff}
+.studio-reasoning p{padding:10px 8px;max-height:180px;overflow:auto}

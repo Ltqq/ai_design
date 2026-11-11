@@ -2,164 +2,178 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ActionIcon, Badge, Button, Group, NumberInput, Paper, ScrollArea, SegmentedControl, Stack, Text, Textarea, TextInput, Title, Tooltip } from '@mantine/core';
-import { ArrowRight, Check, Download, ImagePlus, LayoutTemplate, MessageCircle, Paperclip, Plus, Send, Settings2, Sparkles, Trash2, WandSparkles, X } from 'lucide-react';
+import { ActionIcon, Badge, Button, Group, NumberInput, Paper, ScrollArea, SegmentedControl, Stack, Text, Textarea, TextInput, Title } from '@mantine/core';
+import { ArrowRight, Check, ImagePlus, MessageCircle, Paperclip, Plus, Send, Settings2, Sparkles, Trash2, WandSparkles, X, Activity, Clock3, RotateCcw, ChevronDown } from 'lucide-react';
 import { Heading, Loading, readJSON } from '@/components/ui';
-import type { ChatMessage, ChatSession, StudioState } from '@/types';
+import type { ChatMessage, ChatSession, StudioState, StudioEvent, StudioRun } from '@/types';
 
-type DesignView = StudioState & { preview: string };
-const blankDesign: DesignView = { referencePath: '', draftId: '', templateId: '', width: 1080, height: 1440, preview: '' };
-const ideas = [
-  { title: '直接做模板', prompt: '帮我做一张 1080×1440 的 AI 模型促销海报，暗黑科技风、立体卡片，突出模型名称和折扣，最后转换成可复用的 HTML 模板。' },
-  { title: '只生成设计图', prompt: '生成一张精致的 AI 模型促销海报参考图，深蓝紫色立体科技风，突出醒目的折扣展示区域。' },
-  { title: '我有参考图片', prompt: '把我上传的参考图片转换成可复用的 HTML/CSS 模板，模型名称与折扣必须能够自动填充。' },
+type DesignView=StudioState & {preview:string};
+const blankDesign:DesignView={referencePath:'',draftId:'',templateId:'',width:1080,height:1440,preview:''};
+const ideas=[
+  {title:'直接做模板',prompt:'帮我做一张 1080×1440 的 AI 模型促销海报，暗黑科技风、立体卡片，突出模型名称和折扣，最后转换成可复用的 HTML 模板。'},
+  {title:'只生成设计图',prompt:'生成一张精致的 AI 模型促销海报参考图，深蓝紫色立体科技风，突出醒目的折扣展示区域。'},
+  {title:'我有参考图片',prompt:'把我上传的参考图片转换成可复用的 HTML/CSS 模板，模型名称与折扣必须能够自动填充。'},
 ];
+const tools:Record<string,string>={generateImage:'生成参考海报',convertToTemplate:'图片转 HTML 模板',reviseTemplate:'修改海报模板',saveTemplate:'保存到模板库'};
 
-export default function CreatePage() {
-  const [sessions, setSessions] = useState<ChatSession[]>([]);
-  const [threadId, setThreadId] = useState('');
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [design, setDesign] = useState<DesignView>(blankDesign);
-  const [input, setInput] = useState('');
-  const [attachment, setAttachment] = useState('');
-  const [templateName, setTemplateName] = useState('');
-  const [tab, setTab] = useState<'reference' | 'template'>('reference');
-  const [busy, setBusy] = useState('');
-  const [error, setError] = useState('');
-  const fileRef = useRef<HTMLInputElement>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
+export default function CreatePage(){
+  const [sessions,setSessions]=useState<ChatSession[]>([]);
+  const [threadId,setThreadId]=useState('');
+  const [messages,setMessages]=useState<ChatMessage[]>([]);
+  const [design,setDesign]=useState<DesignView>(blankDesign);
+  const [run,setRun]=useState<StudioRun|null>(null);
+  const [events,setEvents]=useState<StudioEvent[]>([]);
+  const [liveText,setLiveText]=useState('');
+  const [input,setInput]=useState('');
+  const [attachment,setAttachment]=useState('');
+  const [templateName,setTemplateName]=useState('');
+  const [tab,setTab]=useState<'reference'|'template'>('reference');
+  const [uploading,setUploading]=useState(false);
+  const [error,setError]=useState('');
+  const fileRef=useRef<HTMLInputElement>(null);
+  const scrollRef=useRef<HTMLDivElement>(null);
+  const seenEvents=useRef<Set<number>>(new Set());
+  const busy=run?.status==='running'||uploading;
 
-  const refreshSessions = async () => {
-    const data = await readJSON(await fetch('/api/studio', { cache: 'no-store' }));
-    setSessions(data.sessions);
-    return data.sessions as ChatSession[];
+  const refreshSessions=async()=>{
+    const result=await readJSON(await fetch('/api/studio',{cache:'no-store'}));
+    setSessions(result.sessions);
+    return result.sessions as ChatSession[];
   };
-  const openSession = async (id: string) => {
-    setError('');
-    const result = await readJSON(await fetch(`/api/studio?threadId=${id}`, { cache: 'no-store' }));
-    setThreadId(id);
-    setMessages(result.messages);
-    setDesign(result.design);
-    setTab(result.design.preview ? 'template' : 'reference');
-    setAttachment('');
-    setInput('');
+  const openSession=async(id:string)=>{
+    const result=await readJSON(await fetch(`/api/studio?threadId=${id}`,{cache:'no-store'}));
+    setThreadId(id);setMessages(result.messages);setDesign(result.design);
+    setRun(result.run||null);setEvents(result.events||[]);
+    seenEvents.current=new Set((result.events||[]).map((event:StudioEvent)=>event.id));
+    setLiveText('');setTab(result.design.preview?'template':'reference');
+    setAttachment('');setInput('');setError('');
   };
-  useEffect(() => {
-    refreshSessions().then(list => { if (list.length) return openSession(list[0].id); }).catch(err => setError(err.message));
-  }, []);
-  useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }); }, [messages, busy]);
+  useEffect(()=>{refreshSessions().then(list=>{if(list.length)return openSession(list[0].id)}).catch(e=>setError(e.message))},[]);
+  useEffect(()=>{scrollRef.current?.scrollTo({top:scrollRef.current.scrollHeight,behavior:'smooth'})},[messages,events,liveText]);
+  useEffect(()=>{
+    if(run?.status!=='running')return;
+    const activeId=run.id;
+    const stream=new EventSource(`/api/studio/runs/${activeId}/events`);
+    stream.addEventListener('update',(raw)=>{
+      const event=JSON.parse((raw as MessageEvent).data) as StudioEvent;
+      if(seenEvents.current.has(event.id))return;
+      seenEvents.current.add(event.id);
+      if(event.type==='text')setLiveText(previous=>previous+String(event.payload.text||''));
+      else {
+        setEvents(previous=>[...previous,event]);
+        if((event.type==='progress'||event.type==='tool'||event.type==='finished')&&event.payload.design){
+          const updated=event.payload.design as DesignView;
+          setDesign(updated);
+          if(updated.preview)setTab('template');
+        }
+        if(event.type==='finished'){
+          stream.close();
+          if(event.payload.status==='failed')setError(String(event.payload.error||'执行失败，已保留当前设计'));
+          void openSession(threadId).then(refreshSessions).catch(e=>setError(e.message));
+        }
+      }
+    });
+    stream.onerror=()=>{ /* EventSource automatically reconnects and replays missed events. */ };
+    return()=>stream.close();
+  },[run?.id,run?.status,threadId]);
 
-  const newSession = () => {
-    if (busy) return;
-    setThreadId('');
-    setMessages([]);
-    setDesign(blankDesign);
-    setTemplateName('');
-    setInput('');
-    setAttachment('');
-    setTab('reference');
-    setError('');
+  const newSession=()=>{
+    setThreadId('');setMessages([]);setRun(null);setEvents([]);setDesign(blankDesign);
+    setLiveText('');setTemplateName('');setAttachment('');setInput('');setTab('reference');setError('');
+    seenEvents.current=new Set();
   };
-  const upload = async (file: File) => {
-    setBusy('上传图片中…'); setError('');
-    try {
-      const data = new FormData(); data.append('file', file);
-      const result = await readJSON(await fetch('/api/images/upload', { method: 'POST', body: data }));
-      setAttachment(result.referencePath);
-      setTab('reference');
-    } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
-    finally { setBusy(''); }
+  const upload=async(file:File)=>{
+    setUploading(true);setError('');
+    try{
+      const data=new FormData();data.append('file',file);
+      const result=await readJSON(await fetch('/api/images/upload',{method:'POST',body:data}));
+      setAttachment(result.referencePath);setTab('reference');
+    }catch(e){setError(e instanceof Error?e.message:String(e))}finally{setUploading(false)}
   };
-  const send = async (override?: string) => {
-    const text = (override ?? input).trim() || (attachment ? '请把这张图片转换成可复用的海报模板。' : '');
-    if (!text || busy) return;
-    const imagePath = attachment;
-    const optimistic: ChatMessage = { id: 'pending', role: 'user', content: text, imagePath: imagePath || null, createdAt: new Date().toISOString() };
-    setMessages(prev => [...prev, optimistic]);
-    setInput(''); setAttachment(''); setError(''); setBusy('设计 Agent 正在处理…');
-    try {
-      const result = await readJSON(await fetch('/api/studio', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ threadId: threadId || undefined, message: text, imagePath: imagePath || undefined, width: design.width, height: design.height }) }));
-      setThreadId(result.threadId);
-      setDesign(result.design);
-      setTab(result.design.preview ? 'template' : 'reference');
-      const history = await readJSON(await fetch(`/api/studio?threadId=${result.threadId}`, { cache: 'no-store' }));
-      setMessages(history.messages);
+  const send=async(override?:string)=>{
+    const message=(override??input).trim()||(attachment?'请把这张图片转换成可复用的海报模板。':'');
+    if(!message||busy)return;
+    const imagePath=attachment;
+    const optimistic:ChatMessage={id:'pending',role:'user',content:message,imagePath:imagePath||null,createdAt:new Date().toISOString()};
+    setMessages(previous=>[...previous,optimistic]);setInput('');setAttachment('');setError('');setLiveText('');
+    try{
+      const result=await readJSON(await fetch('/api/studio',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({threadId:threadId||undefined,message,imagePath:imagePath||undefined,width:design.width,height:design.height})}));
+      setThreadId(result.threadId);setDesign(result.design);setEvents([]);seenEvents.current=new Set();
+      setRun({id:result.runId,threadId:result.threadId,status:'running',error:null,createdAt:new Date().toISOString(),finishedAt:null});
       await refreshSessions();
-    } catch (e) {
-      setMessages(prev => prev.filter(item => item.id !== 'pending'));
-      setInput(text); setAttachment(imagePath);
-      setError(e instanceof Error ? e.message : String(e));
-    } finally { setBusy(''); }
+    }catch(e){
+      setMessages(previous=>previous.filter(item=>item.id!=='pending'));
+      setInput(message);setAttachment(imagePath);setError(e instanceof Error?e.message:String(e));
+    }
   };
-  const removeSession = async () => {
-    if (!threadId || !confirm('删除当前对话及其消息？已保存的海报模板不会被删除。')) return;
-    try {
-      await readJSON(await fetch(`/api/studio?threadId=${threadId}`, { method: 'DELETE' }));
-      newSession();
-      await refreshSessions();
-    } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+  const removeSession=async()=>{
+    if(!threadId||run?.status==='running'||!confirm('删除当前对话及消息？已保存的模板仍会保留。'))return;
+    try{
+      await readJSON(await fetch(`/api/studio?threadId=${threadId}`,{method:'DELETE'}));
+      newSession();await refreshSessions();
+    }catch(e){setError(e instanceof Error?e.message:String(e))}
   };
-  const currentReference = attachment || design.referencePath;
-  const visual = tab === 'template' && design.preview ? design.preview : currentReference;
+  const reference=attachment||design.referencePath;
+  const visual=tab==='template'&&design.preview?design.preview:reference;
+  const activity=events.filter(event=>event.type==='progress'||event.type==='tool'||event.type==='usage');
+  const reasoning=events.filter(event=>event.type==='reasoning').map(event=>String(event.payload.text||'')).join('');
+  const latestError=run?.status==='failed'||run?.status==='interrupted'?run.error:null;
 
   return <>
-    <Heading eyebrow="AI POSTER STUDIO" title="AI 海报创作工作台" description="上传参考图或描述想法，和设计 Agent 对话。生图、转换模板、自然语言修改与保存，都在这里完成。" aside={<Link className="btn ghost" href="/settings"><Settings2 size={16}/>模型设置</Link>} />
+    <Heading eyebrow="AI POSTER STUDIO" title="AI 海报创作工作台" description="只需要描述需求或上传参考图，Agent 会调用工具完成生图、模板转换与修改；即使离开页面，任务也会继续执行。" aside={<Link className="btn ghost" href="/settings"><Settings2 size={16}/>模型设置</Link>}/>
     <div className="studio-layout">
       <Paper withBorder radius="lg" p="md" className="studio-threads">
-        <Button fullWidth leftSection={<Plus size={16}/>} onClick={newSession} disabled={!!busy}>新建创作</Button>
+        <Button fullWidth leftSection={<Plus size={16}/>} onClick={newSession}>新建创作</Button>
         <Text size="xs" c="dimmed" fw={700} mt="lg" mb="xs">历史创作</Text>
-        <ScrollArea className="studio-thread-scroll">
-          <Stack gap={6}>
-            {sessions.map(session => <Button key={session.id} fullWidth variant={threadId === session.id ? 'light' : 'subtle'} color={threadId === session.id ? 'violet' : 'gray'} justify="start" className="studio-thread" onClick={() => openSession(session.id)} disabled={!!busy} leftSection={<MessageCircle size={15}/>}>{session.title}</Button>)}
-            {!sessions.length && <Text c="dimmed" size="xs" mt="sm">第一条创作消息发送后会自动保存。</Text>}
-          </Stack>
-        </ScrollArea>
-        {threadId && <Button color="red" variant="subtle" size="xs" leftSection={<Trash2 size={14}/>} onClick={removeSession} disabled={!!busy}>删除此对话</Button>}
+        <ScrollArea className="studio-thread-scroll"><Stack gap={6}>
+          {sessions.map(session=><Button key={session.id} fullWidth variant={threadId===session.id?'light':'subtle'} color={threadId===session.id?'violet':'gray'} justify="start" className="studio-thread" onClick={()=>openSession(session.id)} leftSection={<MessageCircle size={15}/>}>{session.title}</Button>)}
+          {!sessions.length&&<Text c="dimmed" size="xs" mt="sm">发送第一条消息后，会话自动保存。</Text>}
+        </Stack></ScrollArea>
+        {threadId&&<Button color="red" variant="subtle" size="xs" leftSection={<Trash2 size={14}/>} onClick={removeSession} disabled={run?.status==='running'}>删除此对话</Button>}
       </Paper>
-
       <Paper withBorder radius="lg" p={0} className="studio-chat">
         <Group justify="space-between" px="lg" py="md" className="studio-chat-top">
-          <Group gap="xs"><span className="studio-agent-icon"><Sparkles size={18}/></span><div><Text fw={750} size="sm">海报设计 Agent</Text><Text size="xs" c="dimmed">对话驱动 · 自动调用设计工具</Text></div></Group>
-          <Badge color={busy ? 'yellow' : 'teal'} variant="light">{busy ? '创作中' : '就绪'}</Badge>
+          <Group gap="xs"><span className="studio-agent-icon"><Sparkles size={18}/></span><div><Text fw={750} size="sm">海报设计 Agent</Text><Text size="xs" c="dimmed">Mastra · 真实工具执行时间线</Text></div></Group>
+          <Badge color={busy?'yellow':latestError?'red':'teal'} variant="light">{busy?'运行中 · 切页不中断':latestError?'需要处理':'就绪'}</Badge>
         </Group>
         <ScrollArea className="studio-messages" viewportRef={scrollRef}>
-          {messages.length ? <Stack gap="lg" p="lg">{messages.map(item => <div key={item.id} className={`studio-message ${item.role}`}>
-            <Text size="xs" c="dimmed" fw={700} mb={6}>{item.role === 'assistant' ? 'AI DESIGN' : '你'}</Text>
-            {item.imagePath && <img src={item.imagePath} alt="消息附带的设计参考图" className="studio-message-image"/>}
-            <Text size="sm" lh={1.85} style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{item.content}</Text>
-          </div>)}</Stack> : <Stack align="center" justify="center" gap="md" p="xl" className="studio-welcome">
-            <span className="studio-welcome-icon"><WandSparkles size={27}/></span>
-            <Title order={3} ta="center">从灵感到可复用海报</Title>
-            <Text size="sm" c="dimmed" ta="center">直接描述你想要的效果，或者附上一张参考图。Agent 会按你的需求操作。</Text>
-            <Stack w="100%" gap="sm" mt="sm">{ideas.map(item => <Button key={item.title} size="md" variant="light" color="gray" className="studio-idea" fullWidth justify="start" onClick={() => item.title === '我有参考图片' ? fileRef.current?.click() : send(item.prompt)} disabled={!!busy}>{item.title}<ArrowRight size={15} style={{ marginLeft: 'auto' }}/></Button>)}</Stack>
+          {messages.length?<Stack gap="lg" p="lg">{messages.map(item=><div key={item.id} className={`studio-message ${item.role}`}>
+            <Text size="xs" c="dimmed" fw={700} mb={6}>{item.role==='assistant'?'AI DESIGN':'你'}</Text>
+            {item.imagePath&&<img src={item.imagePath} alt="消息附带的设计参考图" className="studio-message-image"/>}
+            <Text size="sm" lh={1.85} style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere'}}>{item.content}</Text>
+          </div>)}
+            {(activity.length>0||reasoning)&&<Paper p="md" radius="md" withBorder className="studio-event-panel">
+              <Group gap="xs" mb="sm"><Activity size={16}/><Text size="sm" fw={700}>Agent 执行记录</Text><Badge variant="light" color="gray">已持久保存</Badge></Group>
+              <Stack gap={8}>{activity.slice(-18).map(item=><Group gap="sm" key={item.id} className="studio-event-row">
+                {item.type==='tool'?item.payload.status==='running'?<Clock3 size={15} color="#bba9ff"/>:<Check size={15} color="#66dbb3"/>:<Activity size={15} color="#9ca8cb"/>}
+                <Text size="xs">{item.type==='tool'?`${tools[String(item.payload.toolName)]||String(item.payload.toolName)} · ${item.payload.status==='running'?'正在执行':'完成'}`:item.type==='usage'?`Token：输入 ${item.payload.inputTokens??'-'} / 输出 ${item.payload.outputTokens??'-'}`:String(item.payload.stage||'处理中')}</Text>
+              </Group>)}</Stack>
+              {reasoning&&<details className="studio-reasoning"><summary><ChevronDown size={14}/>模型返回的思考内容</summary><Text size="xs" lh={1.7} style={{whiteSpace:'pre-wrap'}}>{reasoning}</Text></details>}
+            </Paper>}
+            {run?.status==='running'&&<div className="studio-message assistant"><Text size="xs" fw={700} c="violet.3" mb={6}>AI DESIGN · 正在回复</Text>{liveText?<Text size="sm" lh={1.85} style={{whiteSpace:'pre-wrap'}}>{liveText}</Text>:<Loading text="正在处理模型响应或执行工具…"/>}</div>}
+          </Stack>:<Stack align="center" justify="center" gap="md" p="xl" className="studio-welcome">
+            <span className="studio-welcome-icon"><WandSparkles size={27}/></span><Title order={3} ta="center">从灵感到可复用海报</Title>
+            <Text size="sm" c="dimmed" ta="center">直接描述你想要的效果，或上传参考图。工具执行进度会在对话中显示。</Text>
+            <Stack w="100%" gap="sm" mt="sm">{ideas.map(idea=><Button key={idea.title} size="md" variant="light" color="gray" className="studio-idea" fullWidth justify="start" onClick={()=>idea.title==='我有参考图片'?fileRef.current?.click():send(idea.prompt)} disabled={!!busy}>{idea.title}<ArrowRight size={15} style={{marginLeft:'auto'}}/></Button>)}</Stack>
           </Stack>}
-          {busy === '设计 Agent 正在处理…' && <div className="studio-thinking"><Loading text="AI 正在分析需求、调用工具并更新预览…"/></div>}
+          {run?.status==='running'&&!messages.length&&<div className="studio-thinking"><Loading text="任务正在后台执行…"/></div>}
         </ScrollArea>
         <div className="studio-composer">
-          {error && <Paper withBorder p="sm" mb="xs" c="red" role="alert"><Text size="xs">{error}</Text></Paper>}
-          {attachment && <Group gap="xs" mb="xs"><img src={attachment} alt="待发送的参考图" className="studio-attachment"/><Text size="xs" c="dimmed">已添加参考图</Text><ActionIcon aria-label="移除附件" size="sm" color="gray" variant="subtle" onClick={() => setAttachment('')}><X size={15}/></ActionIcon></Group>}
-          <Textarea autosize minRows={2} maxRows={5} value={input} disabled={!!busy} onChange={event => setInput(event.currentTarget.value)} placeholder="例如：帮我做暗黑立体风格的模型折扣模板；或者把卡片调亮一点…" aria-label="向设计 Agent 输入消息" onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); send(); } }}/>
-          <Group justify="space-between" mt="sm">
-            <Group gap="xs"><input type="file" accept="image/png,image/jpeg,image/webp" hidden ref={fileRef} onChange={event => { if (event.target.files?.[0]) upload(event.target.files[0]); event.target.value = ''; }}/><Button size="xs" color="gray" variant="subtle" leftSection={<Paperclip size={15}/>} onClick={() => fileRef.current?.click()} disabled={!!busy}>上传参考图</Button><Text c="dimmed" size="xs">Enter 发送</Text></Group>
-            <Button size="sm" rightSection={<Send size={15}/>} onClick={() => send()} disabled={!!busy || (!input.trim() && !attachment)}>发送</Button>
-          </Group>
+          {(error||latestError)&&<Paper withBorder p="sm" mb="xs" c="red" role="alert"><Group justify="space-between"><Text size="xs">{error||latestError}</Text>{latestError&&<Button size="xs" variant="light" leftSection={<RotateCcw size={13}/>} onClick={()=>{const last=[...messages].reverse().find(item=>item.role==='user');if(last){setInput(last.content);setAttachment(last.imagePath||'')}}}>恢复上次输入</Button>}</Group></Paper>}
+          {attachment&&<Group gap="xs" mb="xs"><img src={attachment} alt="待发送的参考图" className="studio-attachment"/><Text size="xs" c="dimmed">已添加参考图</Text><ActionIcon aria-label="移除附件" size="sm" color="gray" variant="subtle" onClick={()=>setAttachment('')}><X size={15}/></ActionIcon></Group>}
+          <Textarea autosize minRows={2} maxRows={5} value={input} disabled={!!busy} onChange={event=>setInput(event.currentTarget.value)} placeholder="例如：生成一张科技风海报，再转成模板；或者把卡片调亮一点…" aria-label="向设计 Agent 输入消息" onKeyDown={event=>{if(event.key==='Enter'&&!event.shiftKey&&!event.nativeEvent.isComposing){event.preventDefault();send()}}}/>
+          <Group justify="space-between" mt="sm"><Group gap="xs"><input type="file" accept="image/png,image/jpeg,image/webp" hidden ref={fileRef} onChange={event=>{if(event.target.files?.[0])upload(event.target.files[0]);event.target.value=''}}/><Button size="xs" color="gray" variant="subtle" leftSection={<Paperclip size={15}/>} onClick={()=>fileRef.current?.click()} disabled={!!busy}>上传参考图</Button><Text c="dimmed" size="xs">Enter 发送</Text></Group><Button size="sm" rightSection={<Send size={15}/>} onClick={()=>send()} disabled={!!busy||(!input.trim()&&!attachment)}>发送</Button></Group>
         </div>
       </Paper>
-
       <Paper withBorder radius="lg" p="lg" className="studio-preview-panel">
-        <Group justify="space-between" mb="md"><div><Text fw={750}>设计预览</Text><Text size="xs" c="dimmed">始终展示当前会话的设计结果</Text></div><Badge variant="outline" color="gray">{design.width} × {design.height}</Badge></Group>
-        <SegmentedControl size="sm" fullWidth value={tab} onChange={value => setTab(value as 'reference' | 'template')} data={[{label:'参考图片',value:'reference'},{label:'HTML 模板',value:'template',disabled:!design.preview}]} mb="md"/>
-        <div className="studio-preview-stage">{visual ? <img src={visual} alt={tab === 'template' && design.preview ? '当前可复用 HTML 模板预览' : '当前海报参考图'}/> : <Stack justify="center" align="center" gap="sm" h="100%" p="lg"><ImagePlus size={40} color="#887cbd"/><Text size="sm" ta="center" c="dimmed">图片或 HTML 模板生成后，会在这里显示。</Text></Stack>}</div>
-        <Group gap="sm" mt="md" grow><NumberInput label="宽度 px" min={100} max={4000} value={design.width} onChange={value => setDesign(current => ({...current,width:Number(value)||1080}))} size="xs" disabled={!!busy}/><NumberInput label="高度 px" min={100} max={4000} value={design.height} onChange={value => setDesign(current => ({...current,height:Number(value)||1440}))} size="xs" disabled={!!busy}/></Group>
-        <Stack mt="lg" gap="sm">
-          <Button fullWidth variant="light" leftSection={<WandSparkles size={16}/>} onClick={() => send('请把当前参考图片转换为可复用的 HTML 海报模板，模型名称和折扣必须使用动态变量。')} disabled={!currentReference || !!busy}>转换为模板</Button>
-          {design.templateId ? <Group gap="xs" className="studio-saved-indicator"><Check size={15} color="#66dbb3"/><Text size="sm" c="teal.3">模板已保存到模板库，可继续对话修改设计。</Text></Group>
-            : design.draftId ? <>
-              <TextInput label="模板名称" placeholder="如：暗黑科技促销海报" value={templateName} onChange={event => setTemplateName(event.currentTarget.value)}/>
-              <Button fullWidth leftSection={<Check size={16}/>} disabled={!templateName.trim() || !!busy} onClick={() => send(`请把当前设计保存为模板，名字是「${templateName.trim()}」。`)}>保存到模板库</Button>
-            </> : null}
-          {design.templateId ? <Button component={Link} href={`/posters?template=${design.templateId}`} fullWidth color="teal" rightSection={<ArrowRight size={16}/>}>用 Excel 填充海报</Button> : null}
-          {design.preview && <Text size="xs" c="dimmed" ta="center">不满意？直接在左侧告诉 Agent 需要怎样修改。</Text>}
+        <Group justify="space-between" mb="md"><div><Text fw={750}>设计预览</Text><Text size="xs" c="dimmed">随工具执行更新，切页返回继续查看</Text></div><Badge variant="outline" color="gray">{design.width} × {design.height}</Badge></Group>
+        <SegmentedControl size="sm" fullWidth value={tab} onChange={value=>setTab(value as 'reference'|'template')} data={[{label:'参考图片',value:'reference'},{label:'HTML 模板',value:'template',disabled:!design.preview}]} mb="md"/>
+        <div className="studio-preview-stage">{visual?<img src={visual} alt={tab==='template'&&design.preview?'当前可复用 HTML 模板预览':'当前海报参考图'}/>:<Stack justify="center" align="center" gap="sm" h="100%" p="lg"><ImagePlus size={40} color="#887cbd"/><Text size="sm" ta="center" c="dimmed">图片或 HTML 模板生成后，会在这里显示。</Text></Stack>}</div>
+        <Group gap="sm" mt="md" grow><NumberInput label="宽度 px" min={100} max={4000} value={design.width} onChange={value=>setDesign(current=>({...current,width:Number(value)||1080}))} size="xs" disabled={!!busy}/><NumberInput label="高度 px" min={100} max={4000} value={design.height} onChange={value=>setDesign(current=>({...current,height:Number(value)||1440}))} size="xs" disabled={!!busy}/></Group>
+        <Stack mt="lg" gap="sm"><Button fullWidth variant="light" leftSection={<WandSparkles size={16}/>} onClick={()=>send('请把当前参考图片转换为可复用的 HTML 海报模板，模型名称和折扣必须使用动态变量。')} disabled={!reference||!!busy}>转换为模板</Button>
+          {design.templateId?<Group gap="xs" className="studio-saved-indicator"><Check size={15} color="#66dbb3"/><Text size="sm" c="teal.3">模板已保存，继续修改也可从模板库恢复旧版本。</Text></Group>:design.draftId?<><TextInput label="模板名称" placeholder="如：暗黑科技促销海报" value={templateName} onChange={event=>setTemplateName(event.currentTarget.value)}/><Button fullWidth leftSection={<Check size={16}/>} disabled={!templateName.trim()||!!busy} onClick={()=>send(`请把当前设计保存为模板，名字是「${templateName.trim()}」。`)}>保存到模板库</Button></>:null}
+          {design.templateId&&<Button component={Link} href={`/posters?template=${design.templateId}`} fullWidth color="teal" rightSection={<ArrowRight size={16}/>}>用 Excel 填充海报</Button>}
+          {design.preview&&<Text size="xs" c="dimmed" ta="center">不满意？直接告诉 Agent 怎么修改。模板历史版本可在模板库恢复。</Text>}
         </Stack>
       </Paper>
     </div>
