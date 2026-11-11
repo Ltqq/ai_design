@@ -1,0 +1,20 @@
+import { NextResponse } from 'next/server';
+import { z } from 'zod';
+import { reviseSchema } from '@/lib/schemas';
+import { readSource, writeSource } from '@/lib/storage';
+import { withErrors } from '@/lib/http';
+import { askTemplateAgent } from '@/mastra/agents/template-agent';
+import { renderPNG } from '@/lib/render';
+import { previewFields } from '@/lib/template';
+export const runtime='nodejs';
+export const maxDuration=300;
+export const POST=withErrors(async(request:Request,{params}:{params:Promise<{id:string}>})=>{
+  const {id}=await params;
+  z.string().uuid().parse(id);
+  const {instruction}=reviseSchema.parse(await request.json());
+  const previous=await readSource('templates',id);
+  const screenshot=await renderPNG(previous,previewFields(previous.manifest));
+  const source=await askTemplateAgent({prompt:instruction,image:screenshot,mimeType:'image/png',width:previous.manifest.width,height:previous.manifest.height,previous});
+  await writeSource('templates',id,source,await renderPNG(source,previewFields(source.manifest)));
+  return NextResponse.json({success:true});
+});
