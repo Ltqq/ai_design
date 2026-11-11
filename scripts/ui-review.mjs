@@ -132,6 +132,15 @@ try {
   await page.getByText('deepseek-v4.1-flash').first().waitFor();
   await page.getByRole('link', { name: /下载/ }).last().waitFor();
   await page.screenshot({ path: path.join(output, 'posters-filled.png'), fullPage: true });
+  const modelOption=page.locator('.model-option').filter({hasText:'kimi-k3'}).locator('input[type=checkbox]');
+  await modelOption.uncheck();
+  const fieldsPanel=page.locator('.panel').filter({has:page.getByRole('heading',{name:'海报文案'})});
+  await fieldsPanel.locator('input').first().fill('测试 · 已保存的海报文案');
+  await page.waitForTimeout(900);
+  await page.reload({waitUntil:'networkidle'});
+  if(await page.locator('.model-option').filter({hasText:'kimi-k3'}).locator('input[type=checkbox]').isChecked())throw new Error('海报勾选状态刷新后丢失');
+  if(await page.locator('.panel').filter({has:page.getByRole('heading',{name:'海报文案'})}).locator('input').first().inputValue()!=='测试 · 已保存的海报文案')throw new Error('海报文案刷新后丢失');
+  console.log('UI poster model selection and copy persist after reload ✓');
   console.log('UI Excel import → preview → PNG download → persisted reload ✓');
 
   // Real UI template management: copy and delete a copy.
@@ -176,6 +185,18 @@ try {
   await page.getByRole('link',{name:'用 Excel 填充海报'}).waitFor();
   console.log('UI save template → page reload → design state restored ✓');
   await page.screenshot({path:path.join(output,'create-with-template.png'),fullPage:true});
+  await page.goto(`${origin}/templates`,{waitUntil:'networkidle'});
+  const savedCard=page.locator('.template-card').filter({hasText:'界面测试 · 已保存的设计模板'});
+  await savedCard.getByRole('button',{name:/编辑/}).click();
+  await page.getByLabel('用自然语言微调设计').fill('让卡片更有立体感');
+  await page.getByRole('button',{name:'让 Agent 重新设计'}).click();
+  await page.getByText('AI 设计修改完成').waitFor({timeout:90000});
+  await page.locator('.template-card').filter({hasText:'界面测试 · 已保存的设计模板'}).getByRole('button',{name:/编辑/}).click();
+  page.once('dialog',dialog=>dialog.accept());
+  await page.getByRole('button',{name:'恢复此版本'}).click();
+  await page.getByText('历史版本已恢复').waitFor({timeout:90000});
+  console.log('UI revise saved template → browse and restore previous version ✓');
+  await page.goto(`${origin}/create`,{waitUntil:'networkidle'});
   await page.getByRole('button',{name:'新建创作'}).click();
   await page.getByRole('textbox',{name:'向设计 Agent 输入消息'}).fill('请生成参考图，做一张科技风格的模型海报');
   await page.getByRole('button',{name:'发送'}).click();
