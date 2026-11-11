@@ -11,7 +11,8 @@ export const GET=withErrors(async(request:Request,{params}:{params:Promise<{id:s
   const encoder=new TextEncoder();
   let canceled=false;
   const stream=new ReadableStream<Uint8Array>({
-    async start(controller){
+    start(controller){
+      void (async()=>{
       try{
         while(!canceled && !request.signal.aborted){
           for(const event of readRunEvents(id,cursor)){
@@ -23,6 +24,7 @@ export const GET=withErrors(async(request:Request,{params}:{params:Promise<{id:s
         }
         if(!canceled)controller.close();
       }catch(error){if(!canceled)controller.error(error)}
+      })();
     },
     cancel(){canceled=true;},
   });
