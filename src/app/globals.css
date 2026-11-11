@@ -235,3 +235,31 @@ h1,h2,h3,p{margin-top:0}
 .mantine-Button-root.icon-button{width:36px;height:36px;padding:0;flex-shrink:0}
 .mantine-Paper-root.panel{min-width:0}
 .mantine-Input-wrapper{width:100%}
+
+/* The editor uses Mantine controls; only its three-pane composition requires custom layout. */
+.studio-layout{display:grid;grid-template-columns:184px minmax(370px,1fr) 330px;gap:14px;align-items:stretch;min-height:680px}
+.studio-threads,.studio-chat,.studio-preview-panel{background:#121b2c;min-width:0}
+.studio-threads{display:flex;flex-direction:column;gap:6px;max-height:760px}
+.studio-thread-scroll{flex:1;min-height:90px}
+.studio-thread{padding-inline:9px;overflow:hidden}
+.studio-thread .mantine-Button-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;text-align:left;width:100%}
+.studio-chat{display:flex;flex-direction:column;height:690px;overflow:hidden}
+.studio-chat-top{border-bottom:1px solid var(--line)}
+.studio-agent-icon,.studio-welcome-icon{display:grid;place-items:center;background:#3a346b;color:#dbd5ff;border-radius:14px;width:38px;height:38px}
+.studio-messages{flex:1;min-height:0}
+.studio-welcome{min-height:380px}
+.studio-welcome-icon{width:56px;height:56px;border-radius:18px}
+.studio-idea .mantine-Button-label{width:100%;justify-content:space-between}
+.studio-message{max-width:96%;padding:14px 15px;border-radius:14px;background:#1d2b41;border:1px solid #2e3d56}
+.studio-message.user{align-self:flex-end;background:#332e59;border-color:#645994}
+.studio-message.assistant{align-self:flex-start}
+.studio-message-image{display:block;max-width:100%;max-height:170px;object-fit:contain;border-radius:8px;margin-bottom:10px}
+.studio-thinking{padding:8px 25px 20px}
+.studio-composer{padding:17px;border-top:1px solid var(--line);background:#111b2d}
+.studio-attachment{width:42px;height:42px;border-radius:9px;object-fit:cover}
+.studio-preview-panel{height:fit-content;min-height:620px}
+.studio-preview-stage{height:390px;border:1px solid #30405c;border-radius:14px;background:linear-gradient(160deg,#0b1020,#1d2440);overflow:hidden;display:flex;align-items:center;justify-content:center}
+.studio-preview-stage>img{max-width:100%;max-height:100%;object-fit:contain}
+@media(max-width:1460px){.studio-layout{grid-template-columns:170px minmax(345px,1fr) 310px;gap:10px}}
+@media(max-width:1180px){.studio-layout{grid-template-columns:180px minmax(0,1fr)}.studio-preview-panel{grid-column:2;min-height:0}.studio-chat{height:640px}.studio-threads{max-height:640px}}
+@media(max-width:760px){.studio-layout{grid-template-columns:1fr}.studio-threads{max-height:148px}.studio-thread-scroll{max-height:70px}.studio-chat{height:640px}.studio-preview-panel{grid-column:auto}.studio-preview-stage{height:440px}}

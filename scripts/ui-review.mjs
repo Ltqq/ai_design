@@ -35,10 +35,9 @@ try {
   page.on('pageerror', error => { throw error; });
 
   for (const [slug, title] of [
-    ['create', '把灵感，变成可复用的海报模板'],
+    ['create', 'AI 海报创作工作台'],
     ['templates', '你的专属海报模板库'],
     ['posters', '让表格，自动变成精美海报'],
-    ['chat', '和你的多模态模型聊创意'],
     ['settings', '连接你的 AI 模型'],
   ]) {
     await page.goto(`${origin}/${slug}`, { waitUntil: 'networkidle' });
@@ -54,9 +53,13 @@ try {
   await page.getByRole('button', { name: '上传参考图' }).click();
   const sampleImage = await (await fetch(`${origin}/api/assets/drafts/${draftId}/thumbnail.png`)).arrayBuffer();
   await page.locator('input[type=file]').setInputFiles({ name: 'reference.png', mimeType: 'image/png', buffer: Buffer.from(sampleImage) });
-  await page.getByText('参考图已就绪').waitFor();
-  await page.getByAltText('海报参考设计图').waitFor();
-  console.log('UI upload reference image ✓');
+  await page.getByText('已添加参考图').waitFor();
+  await page.getByAltText('当前海报参考图').waitFor();
+  if (await page.getByRole('button', { name: '转换为模板' }).isDisabled()) throw new Error('上传图片后转换模板入口应启用');
+  console.log('UI studio image attachment and conversion action ✓');
+  await page.goto(`${origin}/chat`, {waitUntil:'networkidle'});
+  if (!page.url().endsWith('/create')) throw new Error('旧聊天页未跳转到创作工作台');
+  console.log('UI legacy chat redirect ✓');
 
   // Real UI flow: Excel import, select models, browser preview, download PNG, reload persistence.
   await page.goto(`${origin}/posters`, { waitUntil: 'networkidle' });

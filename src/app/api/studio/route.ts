@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { Agent } from '@mastra/core/agent';
 import { z } from 'zod';
 import { chatInputSchema } from '@/lib/schemas';
 import { withErrors } from '@/lib/http';
@@ -38,10 +37,7 @@ export const POST = withErrors(async (request: Request) => {
   if (width) design.width = width;
   if (height) design.height = height;
 
-  const messages: Array<{
-    role: 'user' | 'assistant';
-    content: string | Array<{ type: 'text'; text: string } | { type: 'file'; data: string; mediaType: string }>;
-  }> = [];
+  const messages: Array<{role:'assistant';content:string}|{role:'user';content:string|Array<{type:'text';text:string}|{type:'file';data:string;mediaType:string}>}> = [];
   for (const item of threadId ? getChat(threadId) : []) {
     if (item.imagePath) {
       const bytes = await referenceBytes(item.imagePath);
