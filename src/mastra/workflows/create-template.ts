@@ -25,11 +25,17 @@ const inspectStep=createStep({
     let source=inputData.source;
     let preview=await renderPNG(source,previewFields(source.manifest));
     const reference=await referenceBytes(inputData.referencePath);
-    const feedback=await askTemplateAgent({prompt:`对比参考图与当前 HTML 预览，修正明显的排版、层次、比例偏差，保持现有占位字段及名称不变。参考要求：${inputData.prompt}`,image:reference,comparisonImage:preview,mimeType:inputData.referencePath.endsWith('.webp')?'image/webp':inputData.referencePath.endsWith('.png')?'image/png':'image/jpeg',width:source.manifest.width,height:source.manifest.height,previous:source});
-    source=feedback;
-    preview=await renderPNG(source,previewFields(source.manifest));
     const draftId=randomUUID();
     await writeSource('drafts',draftId,source,preview);
+    try {
+      const feedback=await askTemplateAgent({prompt:`对比参考图与当前 HTML 预览，修正明显的排版、层次、比例偏差，保持现有占位字段及名称不变。参考要求：${inputData.prompt}`,image:reference,comparisonImage:preview,mimeType:inputData.referencePath.endsWith('.webp')?'image/webp':inputData.referencePath.endsWith('.png')?'image/png':'image/jpeg',width:source.manifest.width,height:source.manifest.height,previous:source});
+      const correctedPreview=await renderPNG(feedback,previewFields(feedback.manifest));
+      source=feedback;
+      preview=correctedPreview;
+      await writeSource('drafts',draftId,source,preview);
+    } catch (error) {
+      console.warn('视觉修正失败，保留已成功生成的第一版模板:',error);
+    }
     return {draftId,preview:`/api/assets/drafts/${draftId}/thumbnail.png`,manifest:source.manifest};
   }
 });

@@ -6,7 +6,7 @@ import { generateDesignImage, convertDesignToTemplate, reviseDesignTemplate } fr
 import { renameTemplate, saveDraft } from '@/lib/storage';
 import type { StudioState } from '@/types';
 
-export function designStudioAgent(design: StudioState) {
+export function designStudioAgent(design: StudioState, onUpdate?: (stage:string)=>void) {
   const { config, provider } = configuredModel('vision');
   const tools = {
     generateImage: createTool({
@@ -14,10 +14,12 @@ export function designStudioAgent(design: StudioState) {
       description: '根据用户描述生成全新海报参考图片。如果用户要求完成可复用模板，生成图片后继续调用 convertToTemplate。',
       inputSchema: z.object({ prompt: z.string().min(3).describe('海报的视觉风格和构图要求') }),
       execute: async ({ prompt }: { prompt: string }) => {
+        onUpdate?.('AI 正在生成参考海报');
         const referencePath = await generateDesignImage(prompt);
         design.referencePath = referencePath;
         design.draftId = '';
         design.templateId = '';
+        onUpdate?.('参考海报已生成');
         return { referencePath, message: '参考图片已生成，可直接继续转成模板。' };
       },
     }),
@@ -27,9 +29,10 @@ export function designStudioAgent(design: StudioState) {
       inputSchema: z.object({ instructions: z.string().describe('希望保留的布局、风格和可填充区域') }),
       execute: async ({ instructions }: { instructions: string }) => {
         if (!design.referencePath) return { success: false, message: '请先上传参考图片，或让我生成一张海报。' };
-        const result = await convertDesignToTemplate(design.referencePath, instructions, design.width, design.height);
+        const result = await convertDesignToTemplate(design.referencePath, instructions, design.width, design.height, onUpdate);
         design.draftId = result.draftId;
         design.templateId = '';
+        onUpdate?.('HTML 模板已生成并保存草稿');
         return { success: true, draftId: result.draftId, preview: result.preview, fields: result.manifest.fields };
       },
     }),
@@ -41,7 +44,8 @@ export function designStudioAgent(design: StudioState) {
         const kind = design.templateId ? 'templates' : 'drafts';
         const id = design.templateId || design.draftId;
         if (!id) return { success: false, message: '目前还没有 HTML 模板，请先把图片转换成模板。' };
-        const result = await reviseDesignTemplate(kind, id, instruction);
+        const result = await reviseDesignTemplate(kind, id, instruction, onUpdate);
+        onUpdate?.('模板修改已完成');
         return { success: true, preview: result.preview, fields: result.manifest.fields };
       },
     }),
@@ -53,6 +57,7 @@ export function designStudioAgent(design: StudioState) {
         if (!design.draftId && !design.templateId) return { success: false, message: '尚未生成可保存的 HTML 模板。' };
         if (design.templateId) renameTemplate(design.templateId, name);
         else design.templateId = await saveDraft(design.draftId, name);
+        onUpdate?.('模板已保存到模板库');
         return { success: true, templateId: design.templateId, message: '模板已保存，可以到海报生成页面导入 Excel。' };
       },
     }),
