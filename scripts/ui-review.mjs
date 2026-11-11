@@ -24,12 +24,20 @@ const source = {
 const modelServer = createServer(async (request,response)=>{
   let raw=''; for await(const part of request) raw+=part;
   const payload=JSON.parse(raw);
+  if(request.url?.includes('/images/generations')){
+    const png=await readFile(path.join(dataDir,'drafts',draftId,'thumbnail.png'));
+    response.writeHead(200,{'content-type':'application/json'});
+    response.end(JSON.stringify({created:Math.floor(Date.now()/1000),data:[{b64_json:png.toString('base64')}] }));
+    return;
+  }
   const latest=[...(payload.messages||[])].reverse().find(m=>m.role==='user');
   const userText=JSON.stringify(latest?.content||'');
   const hasToolReply=payload.messages?.some(m=>m.role==='tool');
   let toolCall;
   if(payload.tools?.length && !hasToolReply){
-    if(userText.includes('转换') || userText.includes('HTML 模板')){
+    if(userText.includes('生成参考图')){
+      toolCall={name:'generateImage',arguments:JSON.stringify({prompt:'高级科技风海报，立体设计'})};
+    }else if(userText.includes('转换') || userText.includes('HTML 模板')){
       toolCall={name:'convertToTemplate',arguments:JSON.stringify({instructions:'依照参考图制作可填充模型名称、折扣的模板'})};
     }else if(userText.includes('保存') || userText.includes('模板，名字')){
       toolCall={name:'saveTemplate',arguments:JSON.stringify({name:'界面测试 · 已保存的设计模板'})};
@@ -131,6 +139,12 @@ try {
   await page.reload({ waitUntil: 'networkidle' });
   if (await page.getByLabel('Model ID').first().inputValue() !== 'test-multimodal') throw new Error('UI model configuration did not persist');
   console.log('UI model settings save → reload ✓');
+  await page.getByLabel('API Base URL').nth(1).fill('http://127.0.0.1:44999/v1');
+  await page.getByLabel('Model ID').nth(1).fill('test-image-generation');
+  await page.getByLabel(/API Key/).nth(1).fill('local-image-test-key');
+  await page.getByRole('button',{name:'保存连接'}).nth(1).click();
+  await page.getByText('配置已保存到本机数据库').last().waitFor();
+
 
   // Real UI + Mastra tool execution with a local OpenAI-compatible test endpoint.
   await page.goto(`${origin}/create`, {waitUntil:'networkidle'});
@@ -146,6 +160,13 @@ try {
   await page.reload({waitUntil:'networkidle'});
   await page.getByRole('link',{name:'用 Excel 填充海报'}).waitFor();
   console.log('UI save template → page reload → design state restored ✓');
+  await page.screenshot({path:path.join(output,'create-with-template.png'),fullPage:true});
+  await page.getByRole('button',{name:'新建创作'}).click();
+  await page.getByRole('textbox',{name:'向设计 Agent 输入消息'}).fill('请生成参考图，做一张科技风格的模型海报');
+  await page.getByRole('button',{name:'发送'}).click();
+  await page.getByAltText('当前海报参考图').waitFor({timeout:90000});
+  console.log('UI text prompt → Mastra image tool → generated reference picture ✓');
+
 
 
   await page.close();
