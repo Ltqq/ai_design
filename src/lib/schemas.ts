@@ -18,7 +18,8 @@ export const sourceSchema = z.object({
   html: z.string().min(1).refine(v => !/<script\b|\bon\w+\s*=|<iframe\b|<object\b|<embed\b/i.test(v), '模板只能包含静态 HTML'),
   css: z.string(),
   manifest: manifestSchema,
-}).refine(source => /{{\\s*#each\\s+items\\s*}}/.test(source.html) && /{{\\s*name\\s*}}/.test(source.html) && /{{\\s*discount\\s*}}/.test(source.html) && /{{\\s*\\/each\\s*}}/.test(source.html), 'HTML 必须真实使用 items 循环以及 name、discount 占位符');
+}).refine(source => /\{\{\s*#each\s+items\s*\}\}/.test(source.html) && /\{\{\s*name\s*\}\}/.test(source.html) && /\{\{\s*discount\s*\}\}/.test(source.html) && /\{\{\s*\/each\s*\}\}/.test(source.html), 'HTML 必须真实使用 items 循环以及 name、discount 占位符');
+
 export const posterSchema = z.object({
   templateId: z.string().uuid(),
   models: z.array(z.object({name:z.string().min(1),discount:z.string().min(1)})).min(1).max(6),
