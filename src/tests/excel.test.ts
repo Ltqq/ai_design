@@ -1,19 +1,25 @@
 import { describe,expect,it } from 'vitest';
 import ExcelJS from 'exceljs';
-import { parseExcel } from '../lib/excel';
+import { parseExcel,createExcelTemplate } from '../lib/excel';
 
-describe('真实 Excel 数据解析',()=>{
-  it('使用实际 xlsx 二进制读取工作表、列名与数据',async()=>{
+describe('两列 Excel 模型折扣表',()=>{
+  it('解析真实 xlsx，严格保留模型名称与折扣文案',async()=>{
     const book=new ExcelJS.Workbook();
-    const sheet=book.addWorksheet('模型报价');
-    sheet.addRow(['模型名称','展示售价','活动文案']);
-    sheet.addRow(['Kimi K3',6.9,'活动价']);
-    sheet.addRow(['GLM Flash',3.5,'优惠']);
-    const bytes=await book.xlsx.writeBuffer();
-    const sheets=await parseExcel(Buffer.from(bytes));
-    expect(sheets).toEqual([{name:'模型报价',columns:['模型名称','展示售价','活动文案'],rows:[
-      {'模型名称':'Kimi K3','展示售价':'6.9','活动文案':'活动价'},
-      {'模型名称':'GLM Flash','展示售价':'3.5','活动文案':'优惠'}
-    ]}]);
+    const sheet=book.addWorksheet('模型折扣');
+    sheet.addRow(['模型名称','折扣']);
+    sheet.addRow(['deepseek-v4.1-flash','4折']);
+    sheet.addRow(['kimi-k3','5.7折']);
+    const buffer=Buffer.from(await book.xlsx.writeBuffer());
+    expect(await parseExcel(buffer)).toEqual([{name:'deepseek-v4.1-flash',discount:'4折'},{name:'kimi-k3',discount:'5.7折'}]);
+  });
+  it('可下载的示例模板能被真实解析器读取',async()=>{
+    const buffer=await createExcelTemplate();
+    expect(await parseExcel(buffer)).toEqual([{name:'deepseek-v4.1-flash',discount:'4折'}]);
+  });
+  it('不是约定的两列表头时直接拒绝导入，不覆盖旧数据',async()=>{
+    const book=new ExcelJS.Workbook();
+    book.addWorksheet('错误格式').addRow(['模型名称','价格','折扣']);
+    const buffer=Buffer.from(await book.xlsx.writeBuffer());
+    await expect(parseExcel(buffer)).rejects.toThrow('必须只有两列');
   });
 });

@@ -3,16 +3,37 @@
   "width": 1080,
   "height": 1440,
   "fields": [
-    {"key":"title","label":"主标题","type":"text"},
-    {"key":"subtitle","label":"副标题","type":"text"},
-    {"key":"items","label":"模型卡片","type":"list"},
-    {"key":"qrcode","label":"二维码图片","type":"image"}
+    {
+      "key": "title",
+      "label": "主标题",
+      "type": "text"
+    },
+    {
+      "key": "subtitle",
+      "label": "副标题",
+      "type": "text"
+    },
+    {
+      "key": "items",
+      "label": "模型卡片",
+      "type": "list"
+    },
+    {
+      "key": "qrcode",
+      "label": "二维码图片",
+      "type": "image"
+    }
   ],
   "listFields": {
     "items": [
-      {"key":"name","label":"模型名称"},
-      {"key":"price","label":"展示价格"},
-      {"key":"discount","label":"活动文案"}
+      {
+        "key": "name",
+        "label": "模型名称"
+      },
+      {
+        "key": "discount",
+        "label": "折扣"
+      }
     ]
   }
 }

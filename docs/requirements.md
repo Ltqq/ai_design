@@ -1,6 +1,6 @@
 # AI Design — 需求设计文档
 
-> 状态：**已确认** · 日期：2026-11-11 · 目标仓库：https://github.com/Ltqq/ai_design
+> 状态：**待确认** · 日期：2026-11-11 · 目标仓库：https://github.com/Ltqq/ai_design
 >
 > 本文定义**一次性完整交付**范围，不拆 MVP/一期/二期。技术实现见 [technical-design.md](technical-design.md)。
 

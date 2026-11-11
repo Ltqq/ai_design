@@ -22,3 +22,19 @@ jobs:
         run: npm test
       - name: Build
         run: npm run build
+      - name: Browser page smoke and screenshots
+        run: |
+          npm run start > /tmp/ai-design-server.log 2>&1 &
+          for i in {1..25}; do
+            if curl -sf -o /dev/null http://127.0.0.1:3000/create; then break; fi
+            sleep 1
+          done
+          node scripts/ui-review.mjs
+      - name: Upload UI screenshots and lockfile
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ui-review-and-lockfile
+          path: |
+            artifacts/ui/*.png
+            package-lock.json

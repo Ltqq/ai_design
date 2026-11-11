@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "backup": "node scripts/backup.mjs",
+    "ui:smoke": "node scripts/ui-review.mjs"
   },
   "dependencies": {
     "@ai-sdk/openai-compatible": "^2.0.0",
@@ -17,7 +19,7 @@
     "handlebars": "^4.7.8",
     "lucide-react": "^0.468.0",
     "next": "16.4.6",
-    "playwright": "^1.56.0",
+    "playwright": "1.56.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "ai": "^6.0.0",

@@ -1,0 +1,11 @@
+services:
+  ai-design:
+    build: .
+    restart: unless-stopped
+    init: true
+    ports:
+      - "3000:3000"
+    environment:
+      AI_DESIGN_DATA_DIR: /app/data
+    volumes:
+      - ./data:/app/data
