@@ -32,7 +32,11 @@ describe('SQLite 和模板真实持久化',()=>{
       expect(storage.listChats()[0].id).toBe(threadId);
       storage.saveChatExchange(threadId,'再提一个方案',null,'增加光效。');
       expect(storage.getChat(threadId).map(x=>x.content)).toEqual(['帮我分析海报','建议突出折扣。','再提一个方案','增加光效。']);
+      const state={referencePath:'/api/assets/references/test.png',draftId,templateId:id,width:1080,height:1440};
+      storage.saveStudioState(threadId,state);
+      expect(storage.getStudioState(threadId)).toEqual(state);
       storage.deleteChat(threadId);
+      expect(storage.getStudioState(threadId)).toEqual({referencePath:'',draftId:'',templateId:'',width:1080,height:1440});
       expect(storage.getChat(threadId)).toHaveLength(0);
       await storage.deleteTemplate(id);
       await storage.deleteTemplate(id2);

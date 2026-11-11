@@ -1,6 +1,6 @@
 # AI Design — 技术设计文档
 
-> 状态：**待确认** · 日期：2026-11-11 · 对应需求：[requirements.md](requirements.md)
+> 状态：**已实施** · 日期：2026-11-11 · 对应需求：[requirements.md](requirements.md)
 >
 > 当前仓库为空，本文是待实施设计，不表示已经开发完成。**不分阶段**，实现时一次完成所有已确认范围；不扩展未获批准的功能。
 
@@ -9,7 +9,7 @@
 | 关注点 | 技术 | 原因 |
 | --- | --- | --- |
 | Web / API | **Next.js + TypeScript** | 前后端同仓、Node.js 服务端渲染与 API 路由，部署简单 |
-| UI | Tailwind CSS + shadcn/ui | 快速实现设置、表格、模板库与图片预览 |
+| UI | Mantine UI + 少量布局 CSS | 快速实现设置、表格、模板库与图片预览 |
 | Agent | **Mastra (`@mastra/core`)** | 现成 Agent、Tools、Workflow 及调试能力；不自造 Agent 循环 |
 | 模型适配 | `@ai-sdk/openai-compatible`，按 Mastra 官方 Custom Gateway/Provider 扩展点连接 | 支持用户自定义 Base URL / API Key / Model ID，避免绑定单一厂商 |
 | 图片生成 | AI SDK 的 `generateImage` / 兼容图片接口 | 与多模态理解模型独立配置；上游必须实际支持所调用接口 |
@@ -306,3 +306,11 @@ SQLite 仅保存轻量元信息，最少两张表：
 - AI 生成的 HTML 对任意参考图无法保证像素级复原。以可编辑字段、视觉精美度、正常浏览器渲染为验收目标。
 
 待上述需求确认后，实施时以这两份文档为边界，不擅自追加技术组件或后台服务。
+
+## 统一创作 Agent 及数据模型（2026-11-11）
+
+`/api/studio` 负责加载历史、接收多模态消息、运行 Mastra Agent 和保存设计状态。`designStudioAgent()` 注册 `generateImage`、`convertToTemplate`、`reviseTemplate`、`saveTemplate` 四个 Mastra Tools。它们复用 `src/lib/design-operations.ts` 和已有 Mastra 模板 Workflow，不引入自研 Agent 循环。
+
+SQLite `studio_states` 表按聊天会话 ID 存储 `reference_path`、`draft_id`、`template_id`、`width`、`height`；原 `chat_messages` 存储对话，页面恢复时一次取得这两类数据。原模板库、Excel/PNG 路由保持不变。
+
+`/create` 使用 Mantine 三栏布局：创作会话、对话操作区、参考图与 HTML 预览。旧 `/chat` 重定向。CI 通过模拟浏览器点击，并使用本地 OpenAI 兼容服务代替外部收费模型，调用真实 Mastra 工具链来检查转换、保存和刷新恢复。

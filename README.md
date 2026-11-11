@@ -8,10 +8,9 @@
 
 | 页面 | 功能 |
 | --- | --- |
-| AI 创作 `/create` | AI 生图或上传参考图片、图片转 HTML 模板、参考图与真实渲染对比、自然语言修改、保存模板 |
+| AI 创作工作台 `/create` | 一个 Mastra 设计 Agent 聊天操作生图、图片转 HTML、自然语言修改与保存模板；左侧会话历史、右侧真实预览，刷新可恢复当前设计 |
 | 模板库 `/templates` | 封面浏览、一键使用、复制、重命名、自然语言修改、删除 |
 | 海报生成 `/posters` | Excel 两列自动识别并持久保存；搜索和排序最多 6 个模型；设置标题/二维码；渲染预览、导出 PNG、历史重新下载 |
-| 模型对话 `/chat` | 通过已配置的多模态理解模型多轮对话、上传图片、保存会话、查看历史、删除会话 |
 | 模型配置 `/settings` | 独立配置理解/图片模型 Base URL、Model ID、API Key；测试真实模型能力 |
 
 ### 固定 Excel 格式
@@ -39,7 +38,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-打开 http://localhost:3000 ，先在「模型设置」中分别保存并测试模型。
+打开 http://localhost:3000 ，先在「模型设置」中分别保存并测试模型。然后打开「AI 创作工作台」，输入“帮我生成一张暗黑科技风的折扣海报并转成模板”，或上传参考图让 Agent 转换，满意后说“保存为模板”，最后进入「海报生成」导入两列 Excel。
 
 正式运行：
 
@@ -84,7 +83,7 @@ npm run backup
 
 - **多模态理解**：OpenAI Chat Completions 兼容接口，支持图片输入。图片转模板通过 Mastra Agent 和 Workflow 调用，模型返回标准 HTML/CSS/manifest JSON。
 - **图片生成**：OpenAI 兼容图片生成接口；不是所有中转上游都支持这个接口。
-- **对话**：使用同一个多模态理解模型，可携带上传的图片，历史记录保存在 SQLite。
+- **对话式创作**：多模态理解模型通过 Mastra Tools 调用现有生图、转换、修改和保存流程；同一会话的消息与设计状态保存在 SQLite。
 - 无 API Key 时仍可使用已经保存的模板、导入 Excel 和离线 PNG 渲染。AI 流程需要实际可用的上游模型。
 
 AI 图片还原不是像素级复制。最终营销数据由程序填充，不由 AI 猜测数字。
@@ -107,3 +106,9 @@ GitHub Actions 运行上述检查以及浏览器页面冒烟测试；实际上�
 - `scripts/backup.mjs`：手动备份
 - `docs`：需求和技术文档
 - `AGENTS.md`：开发约束，所有代码变更必须遵循
+
+## 统一创作工作流
+
+在 `/create` 与 Agent 多轮对话，上传图片或直接描述需求。Agent 根据意图调用 **generateImage → convertToTemplate → reviseTemplate → saveTemplate**（不需要每一步手动切页）。右侧实时展示参考图/HTML 预览；保存后出现「用 Excel 填充海报」入口。旧 `/chat` 自动跳转 `/create`，旧对话历史仍可在工作台查看。
+
+无实际模型密钥的 CI 使用一个本地 OpenAI 兼容测试端点替代收费模型，对 Mastra 工具执行、模板渲染、保存及刷新恢复做真实浏览器验收；实际模型兼容性需要用户配置后验证。

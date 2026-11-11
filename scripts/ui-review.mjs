@@ -1,6 +1,7 @@
 import { chromium } from 'playwright';
 import ExcelJS from 'exceljs';
-import { mkdir, cp } from 'node:fs/promises';
+import { mkdir, cp, readFile } from 'node:fs/promises';
+import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 
@@ -12,6 +13,35 @@ await mkdir(output, { recursive: true });
 // Create the offline template fixture; every user operation below happens through the browser.
 const draftId = randomUUID();
 await cp(path.resolve('examples/tech-poster'), path.join(dataDir, 'drafts', draftId), { recursive: true });
+
+// The only substitute in this test is the external paid model; app, Agent tools,
+// template workflow, Chromium and SQLite all run as production code.
+const source = {
+  html: await readFile('examples/tech-poster/template.html','utf8'),
+  css: await readFile('examples/tech-poster/style.css','utf8'),
+  manifest: JSON.parse(await readFile('examples/tech-poster/manifest.json','utf8')),
+};
+const modelServer = createServer(async (request,response)=>{
+  let raw=''; for await(const part of request) raw+=part;
+  const payload=JSON.parse(raw);
+  const latest=[...(payload.messages||[])].reverse().find(m=>m.role==='user');
+  const userText=JSON.stringify(latest?.content||'');
+  const hasToolReply=payload.messages?.some(m=>m.role==='tool');
+  let toolCall;
+  if(payload.tools?.length && !hasToolReply){
+    if(userText.includes('转换') || userText.includes('HTML 模板')){
+      toolCall={name:'convertToTemplate',arguments:JSON.stringify({instructions:'依照参考图制作可填充模型名称、折扣的模板'})};
+    }else if(userText.includes('保存') || userText.includes('模板，名字')){
+      toolCall={name:'saveTemplate',arguments:JSON.stringify({name:'界面测试 · 已保存的设计模板'})};
+    }
+  }
+  const message=toolCall?{role:'assistant',content:null,tool_calls:[{id:'call_test_1',type:'function',function:toolCall}]}:
+    {role:'assistant',content:payload.tools?.length?'模板操作完成，请查看右侧预览。':JSON.stringify(source)};
+  response.writeHead(200,{'content-type':'application/json'});
+  response.end(JSON.stringify({id:'chatcmpl-local',object:'chat.completion',created:Math.floor(Date.now()/1000),model:'local-test',choices:[{index:0,message,finish_reason:toolCall?'tool_calls':'stop'}],usage:{prompt_tokens:30,completion_tokens:30,total_tokens:60}}));
+});
+await new Promise(resolve=>modelServer.listen(44999,'127.0.0.1',resolve));
+
 const browser = await chromium.launch({ headless: true });
 try {
   const thumbnailPage = await browser.newPage({ viewport: { width: 1080, height: 1440 } });
@@ -102,7 +132,24 @@ try {
   if (await page.getByLabel('Model ID').first().inputValue() !== 'test-multimodal') throw new Error('UI model configuration did not persist');
   console.log('UI model settings save → reload ✓');
 
+  // Real UI + Mastra tool execution with a local OpenAI-compatible test endpoint.
+  await page.goto(`${origin}/create`, {waitUntil:'networkidle'});
+  await page.getByRole('button',{name:'上传参考图'}).click();
+  await page.locator('input[type=file]').setInputFiles({name:'reference.png',mimeType:'image/png',buffer:Buffer.from(sampleImage)});
+  await page.getByText('已添加参考图').waitFor();
+  await page.getByRole('button',{name:'转换为模板'}).click();
+  await page.getByAltText('当前可复用 HTML 模板预览').waitFor({timeout:150000});
+  console.log('UI upload → Mastra tool → rendered HTML template ✓');
+  await page.getByRole('textbox',{name:'模板名称'}).fill('界面测试 · 已保存的设计模板');
+  await page.getByRole('button',{name:'保存到模板库'}).click();
+  await page.getByRole('link',{name:'用 Excel 填充海报'}).waitFor({timeout:90000});
+  await page.reload({waitUntil:'networkidle'});
+  await page.getByRole('link',{name:'用 Excel 填充海报'}).waitFor();
+  console.log('UI save template → page reload → design state restored ✓');
+
+
   await page.close();
 } finally {
   await browser.close();
+  await new Promise(resolve=>modelServer.close(resolve));
 }
