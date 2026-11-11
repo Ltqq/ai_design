@@ -153,10 +153,11 @@ export default function CreatePage() {
         <Group gap="sm" mt="md" grow><NumberInput label="宽度 px" min={100} max={4000} value={design.width} onChange={value => setDesign(current => ({...current,width:Number(value)||1080}))} size="xs" disabled={!!busy}/><NumberInput label="高度 px" min={100} max={4000} value={design.height} onChange={value => setDesign(current => ({...current,height:Number(value)||1440}))} size="xs" disabled={!!busy}/></Group>
         <Stack mt="lg" gap="sm">
           <Button fullWidth variant="light" leftSection={<WandSparkles size={16}/>} onClick={() => send('请把当前参考图片转换为可复用的 HTML 海报模板，模型名称和折扣必须使用动态变量。')} disabled={!currentReference || !!busy}>转换为模板</Button>
-          {design.draftId || design.templateId ? <>
-            <TextInput label="模板名称" placeholder="如：暗黑科技促销海报" value={templateName} onChange={event => setTemplateName(event.currentTarget.value)}/>
-            <Button fullWidth leftSection={<Check size={16}/>} disabled={!templateName.trim() || !!busy} onClick={() => send(`请把当前设计保存为模板，名字是「${templateName.trim()}」。`)}>{design.templateId ? '更新模板名称' : '保存到模板库'}</Button>
-          </> : null}
+          {design.templateId ? <Group gap="xs" className="studio-saved-indicator"><Check size={15} color="#66dbb3"/><Text size="sm" c="teal.3">模板已保存到模板库，可继续对话修改设计。</Text></Group>
+            : design.draftId ? <>
+              <TextInput label="模板名称" placeholder="如：暗黑科技促销海报" value={templateName} onChange={event => setTemplateName(event.currentTarget.value)}/>
+              <Button fullWidth leftSection={<Check size={16}/>} disabled={!templateName.trim() || !!busy} onClick={() => send(`请把当前设计保存为模板，名字是「${templateName.trim()}」。`)}>保存到模板库</Button>
+            </> : null}
           {design.templateId ? <Button component={Link} href={`/posters?template=${design.templateId}`} fullWidth color="teal" rightSection={<ArrowRight size={16}/>}>用 Excel 填充海报</Button> : null}
           {design.preview && <Text size="xs" c="dimmed" ta="center">不满意？直接在左侧告诉 Agent 需要怎样修改。</Text>}
         </Stack>
