@@ -5,7 +5,7 @@ on:
   pull_request:
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
@@ -15,7 +15,7 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
       - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install chromium
       - name: Typecheck
         run: npm run typecheck
       - name: Tests
