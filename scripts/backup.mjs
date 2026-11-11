@@ -12,7 +12,7 @@ try{
 }finally{
   database.close();
 }
-for(const name of ['templates','drafts','references','exports']){
+for(const name of ['templates','drafts','references','exports','versions']){
   await cp(path.join(dataDir,name),path.join(target,name),{recursive:true,force:true,errorOnExist:false}).catch(err=>{
     if(err.code!=='ENOENT')throw err;
   });

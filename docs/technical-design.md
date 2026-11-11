@@ -314,3 +314,13 @@ SQLite 仅保存轻量元信息，最少两张表：
 SQLite `studio_states` 表按聊天会话 ID 存储 `reference_path`、`draft_id`、`template_id`、`width`、`height`；原 `chat_messages` 存储对话，页面恢复时一次取得这两类数据。原模板库、Excel/PNG 路由保持不变。
 
 `/create` 使用 Mantine 三栏布局：创作会话、对话操作区、参考图与 HTML 预览。旧 `/chat` 重定向。CI 通过模拟浏览器点击，并使用本地 OpenAI 兼容服务代替外部收费模型，调用真实 Mastra 工具链来检查转换、保存和刷新恢复。
+
+## 持续执行与可观测性（2026-11-11）
+
+- Mastra Agent.stream() 在 Node 服务端独立执行，SSE 连接仅负责订阅进度；任务与事件分别保存到 SQLite studio_runs、studio_events。
+- GET /api/studio/runs/[id]/events 支持事件 ID 重连补发。文本增量、工具调用、实际可用的模型推理、Token 用量均来自 SDK 事件，不伪造思考过程。
+- 最近 12 条消息提供模型上下文，旧图片历史仍保存在本地但不反复编码进每轮请求。
+- Mastra Workflow.stream() 提供模板生成步骤进度；首次 HTML 输出提前落盘，视觉修正失败时仍可使用初稿。
+- AI 生成产物在入口校验实际 Handlebars 模型名称和折扣占位符；修改模板之前将原版存至 versions/，恢复时也保存恢复前版本。
+- poster_draft 保存海报编辑选择与文案；备份脚本同步备份版本目录。
+- 单进程内后台任务不会因浏览器切页取消，进程重启会标记 interrupted，由用户决定是否继续，未引入外部队列。

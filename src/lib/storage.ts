@@ -189,9 +189,9 @@ export function readRunEvents(runId:string,after=0):StudioEvent[] {
   return rows.map(row=>({id:row.id,runId:row.run_id,type:row.type,payload:JSON.parse(row.payload),createdAt:row.created_at}));
 }
 export function recentStudioEvents(threadId:string):StudioEvent[] {
-  // Historical view needs tool/progress/reasoning records; text is already stored in chat_messages.
+  // Historical view stores tool/progress and provider reasoning; completed text is stored as chat.
   const rows=db().prepare(`SELECT e.id,e.run_id,e.type,e.payload,e.created_at FROM studio_events e
-    JOIN studio_runs r ON r.id=e.run_id WHERE r.session_id=? AND e.type NOT IN ('text','reasoning')
+    JOIN studio_runs r ON r.id=e.run_id WHERE r.session_id=? AND e.type <> 'text'
     ORDER BY e.id DESC LIMIT 200`).all(threadId) as Array<{id:number;run_id:string;type:string;payload:string;created_at:string}>;
   return rows.reverse().map(row=>({id:row.id,runId:row.run_id,type:row.type,payload:JSON.parse(row.payload),createdAt:row.created_at}));
 }
