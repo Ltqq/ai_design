@@ -17,6 +17,6 @@ export const POST=withErrors(async(request:Request)=>{
   const verificationTool=createTool({id:'confirm-image',description:'识别图像后必须调用此工具确认结果',inputSchema:z.object({visible:z.boolean()}),outputSchema:z.object({ok:z.boolean()}),execute:async ({visible})=>({ok:visible})});
   const agent=new Agent({id:'capability-check',name:'多模态能力测试',model:provider.chatModel(config.modelId),instructions:'你需要查看图片并调用 confirm-image 工具，传入 visible=true，不要直接答复。',tools:{'confirm-image':verificationTool}});
   const onePixel='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jrN8AAAAASUVORK5CYII=';
-  const result=await agent.generate({messages:[{role:'user',content:[{type:'text',text:'这是一张图片，请执行指定工具确认你支持看图及工具调用。'},{type:'file',data:onePixel,mediaType:'image/png'}]}]});
+  const result=await agent.generate([{role:'user',content:[{type:'text',text:'这是一张图片，请执行指定工具确认你支持看图及工具调用。'},{type:'file',data:onePixel,mediaType:'image/png'}]}]);
   return NextResponse.json({success:result.toolCalls.length>0,message:result.toolCalls.length?'图片输入与工具调用正常':'模型没有发起工具调用，请检查能力支持'});
 });

@@ -14,7 +14,7 @@ function textOf(value: ExcelJS.CellValue): string {
 }
 export async function parseExcel(buffer: Buffer): Promise<SheetData[]> {
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(buffer as Parameters<typeof workbook.xlsx.load>[0]);
+  await workbook.xlsx.load(buffer as unknown as Parameters<typeof workbook.xlsx.load>[0]);
   return workbook.worksheets.map(sheet => {
     const header = sheet.getRow(1);
     const headers = Array.from({length:sheet.columnCount},(_,i)=>({name:textOf(header.getCell(i+1).value),position:i+1})).filter(header=>header.name);

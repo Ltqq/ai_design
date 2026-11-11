@@ -24,6 +24,6 @@ export async function askTemplateAgent(input:{prompt:string; image:Buffer; compa
   const prompt = `${input.previous?'请在已有模板基础上按要求重新输出完整 JSON 源码。':'根据参考图设计完整可填充数据的 HTML/CSS 模板。'}\n尺寸：${input.width}x${input.height}\n要求：${input.prompt}\n${input.previous?'已有模板：'+JSON.stringify(input.previous):''}`;
   const content:Array<{type:'text';text:string}|{type:'file';data:string;mediaType:string}>=[{type:'text',text:prompt},{type:'file',data:input.image.toString('base64'),mediaType:input.mimeType}];
   if(input.comparisonImage)content.push({type:'text',text:'第二张图片为当前 HTML 在浏览器中的渲染结果，请对比第一张参考图后修正。'},{type:'file',data:input.comparisonImage.toString('base64'),mediaType:'image/png'});
-  const result = await templateAgent().generate({messages:[{role:'user',content}]});
+  const result = await templateAgent().generate([{role:'user',content}]);
   return decodeSource(result.text);
 }
