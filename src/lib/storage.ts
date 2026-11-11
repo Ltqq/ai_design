@@ -3,7 +3,7 @@ import { mkdir, readFile, writeFile, cp, rm } from 'node:fs/promises';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import type { ChatMessage, ChatSession, Manifest, ModelConfig, ModelDiscount, ModelKind, PosterRecord, TemplateRecord, TemplateSource } from '@/types';
+import type { ChatMessage, ChatSession, Manifest, ModelConfig, ModelDiscount, ModelKind, PosterRecord, TemplateRecord, TemplateSource, StudioState } from '@/types';
 
 export const dataDir = path.resolve(process.env.AI_DESIGN_DATA_DIR || './data');
 let connection: Database.Database | undefined;
@@ -20,6 +20,7 @@ export function db() {
       CREATE TABLE IF NOT EXISTS poster_exports (id TEXT PRIMARY KEY, template_name TEXT NOT NULL, model_count INTEGER NOT NULL, created_at TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS chat_sessions (id TEXT PRIMARY KEY, title TEXT NOT NULL, updated_at TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS chat_messages (id TEXT PRIMARY KEY, session_id TEXT NOT NULL, role TEXT NOT NULL, content TEXT NOT NULL, image_path TEXT, created_at TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS studio_states (session_id TEXT PRIMARY KEY, reference_path TEXT NOT NULL, draft_id TEXT NOT NULL, template_id TEXT NOT NULL, width INTEGER NOT NULL, height INTEGER NOT NULL);
     `);
   }
   return connection;
@@ -137,5 +138,15 @@ export function deleteChat(id:string) {
   db().transaction(()=>{
     db().prepare('DELETE FROM chat_messages WHERE session_id=?').run(id);
     db().prepare('DELETE FROM chat_sessions WHERE id=?').run(id);
+    db().prepare('DELETE FROM studio_states WHERE session_id=?').run(id);
   })();
+}
+
+export function getStudioState(id?: string): StudioState {
+  const row=id?db().prepare('SELECT reference_path,draft_id,template_id,width,height FROM studio_states WHERE session_id=?').get(id) as {reference_path:string;draft_id:string;template_id:string;width:number;height:number}|undefined:undefined;
+  return row?{referencePath:row.reference_path,draftId:row.draft_id,templateId:row.template_id,width:row.width,height:row.height}:{referencePath:'',draftId:'',templateId:'',width:1080,height:1440};
+}
+export function saveStudioState(id:string, state:StudioState) {
+  db().prepare('INSERT INTO studio_states(session_id,reference_path,draft_id,template_id,width,height) VALUES(?,?,?,?,?,?) ON CONFLICT(session_id) DO UPDATE SET reference_path=excluded.reference_path,draft_id=excluded.draft_id,template_id=excluded.template_id,width=excluded.width,height=excluded.height')
+    .run(id,state.referencePath,state.draftId,state.templateId,state.width,state.height);
 }

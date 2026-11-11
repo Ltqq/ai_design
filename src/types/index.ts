@@ -16,3 +16,5 @@ export type PosterInput = { templateId: string; models: ModelDiscount[]; fixedFi
 export type PosterRecord = { id: string; templateName: string; modelCount: number; createdAt: string };
 export type ChatSession = { id: string; title: string; updatedAt: string };
 export type ChatMessage = { id: string; role: 'user'|'assistant'; content: string; imagePath: string|null; createdAt: string };
+
+export type StudioState = { referencePath:string; draftId:string; templateId:string; width:number; height:number };
