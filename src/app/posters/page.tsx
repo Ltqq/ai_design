@@ -14,18 +14,31 @@ function Editor(){
   const [manifest,setManifest]=useState<Manifest|null>(null),[models,setModels]=useState<ModelDiscount[]>([]);
   const [selected,setSelected]=useState<number[]>([]),[fixed,setFixed]=useState<Record<string,string>>({title:'热门模型 · 限时优惠',subtitle:'精选优质 AI 模型，超值折扣'});
   const [preview,setPreview]=useState(''),[busy,setBusy]=useState(''),[error,setError]=useState(''),[success,setSuccess]=useState(''),[filter,setFilter]=useState('');
-  const [history,setHistory]=useState<PosterRecord[]>([]);
+  const [history,setHistory]=useState<PosterRecord[]>([]);\n  const [ready,setReady]=useState(false);
   const visible=useMemo(()=>models.map((model,index)=>({...model,index})).filter(model=>model.name.toLowerCase().includes(filter.toLowerCase())),[models,filter]);
   const selectedModels=selected.map(index=>models[index]);
   const singles=manifest?.fields.filter(field=>field.type!=='list')||[];
   const reloadHistory=()=>fetch('/api/posters/render').then(readJSON).then(result=>setHistory(result.posters));
   useEffect(()=>{
-    Promise.all([fetch('/api/templates').then(readJSON),fetch('/api/excel/import').then(readJSON),fetch('/api/posters/render').then(readJSON)])
-      .then(([a,b,c])=>{
-        setTemplates(a.templates);setModels(b.models);setSelected(b.models.map((_:ModelDiscount,i:number)=>i).slice(0,4));setHistory(c.posters);
-        if(!params.get('template')&&a.templates[0])setTemplateId(a.templates[0].id);
+    Promise.all([fetch('/api/templates').then(readJSON),fetch('/api/excel/import').then(readJSON),fetch('/api/posters/render').then(readJSON),fetch('/api/posters/draft').then(readJSON)])
+      .then(([a,b,c,d])=>{
+        const saved=d.draft;
+        setTemplates(a.templates);setModels(b.models);setHistory(c.posters);
+        const indices=saved?.selectedNames?.map((name:string)=>b.models.findIndex((model:ModelDiscount)=>model.name===name)).filter((index:number)=>index>=0) as number[]|undefined;
+        setSelected(indices??b.models.map((_:ModelDiscount,i:number)=>i).slice(0,4));
+        if(saved?.fixedFields)setFixed(saved.fixedFields);
+        setTemplateId(params.get('template')||saved?.templateId||a.templates[0]?.id||'');
+        setReady(true);
       }).catch(e=>setError(e.message));
   },[params]);
+  useEffect(()=>{
+    if(!ready)return;
+    const timer=setTimeout(()=>{
+      void fetch('/api/posters/draft',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({templateId,selectedNames:selected.map(index=>models[index].name),fixedFields:fixed})})
+        .then(readJSON).catch(e=>setError('海报编辑状态保存失败：'+e.message));
+    },450);
+    return()=>clearTimeout(timer);
+  },[ready,templateId,models,selected,fixed]);
   useEffect(()=>{
     if(!templateId){setManifest(null);return;}
     fetch(`/api/templates/${templateId}`).then(readJSON).then(result=>{setManifest(result.manifest);setPreview('')}).catch(e=>setError(e.message));
@@ -60,7 +73,7 @@ function Editor(){
     }catch(e){setError(e instanceof Error?e.message:String(e))}finally{setBusy('')}
   };
   return <>
-    <Heading eyebrow="POSTER GENERATOR" title="让表格，自动变成精美海报" description="固定两列：模型名称、折扣。上传一次后自动保存，选择要宣传的模型，预览并导出 PNG。" aside={<a className="btn" href="/api/excel/template"><FileDown size={16}/>下载 Excel 模板</a>}/>
+    <Heading eyebrow="POSTER GENERATOR" title="让表格，自动变成精美海报" description="固定两列：模型名称、折扣。上传一次后自动保存，选择要宣传的模型与文案，刷新也能继续编辑、预览并导出 PNG。" aside={<a className="btn" href="/api/excel/template"><FileDown size={16}/>下载 Excel 模板</a>}/>
     <div className="two-col">
       <div className="stack">
         <Panel title="选择海报模板" description="所有模板都支持按选中的模型自动填充。" aside={<Link className="inline-link" href="/templates">浏览模板库<ArrowRight size={14}/></Link>}>
