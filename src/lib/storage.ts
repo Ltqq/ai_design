@@ -54,8 +54,8 @@ export async function saveDraft(id: string, name: string) {
   return templateId;
 }
 export async function duplicateTemplate(id: string) {
-  const source = await readSource('templates',id);
-  const name = `${source.manifest.name} · 副本`;
+  const row=db().prepare('SELECT name FROM templates WHERE id=?').get(id) as {name:string};
+  const name = `${row.name} · 副本`;
   const draftId = randomUUID();
   await cp(path.join(dataDir,'templates',id), path.join(dataDir,'drafts',draftId), {recursive:true});
   return saveDraft(draftId, name);
