@@ -53,11 +53,11 @@ const modelServer = createServer(async (request,response)=>{
   if(payload.stream){
     if(userText.includes('切页验证'))await new Promise(resolve=>setTimeout(resolve,2500));
     response.writeHead(200,{'content-type':'text/event-stream','cache-control':'no-cache','connection':'keep-alive'});
-    const emit=(delta,reason=null)=>response.write('data: '+JSON.stringify({id:'chatcmpl-local',object:'chat.completion.chunk',created:Math.floor(Date.now()/1000),model:'local-test',choices:[{index:0,delta,finish_reason:reason}]})+'\\n\\n');
+    const emit=(delta,reason=null)=>response.write('data: '+JSON.stringify({id:'chatcmpl-local',object:'chat.completion.chunk',created:Math.floor(Date.now()/1000),model:'local-test',choices:[{index:0,delta,finish_reason:reason}]})+'\n\n');
     if(toolCall)emit({role:'assistant',tool_calls:[{index:0,id:'call_test_1',type:'function',function:toolCall}]});
     else emit({role:'assistant',content:message.content||''});
     emit({},toolCall?'tool_calls':'stop');
-    response.end('data: [DONE]\\n\\n');
+    response.end('data: [DONE]\n\n');
   }else{
     response.writeHead(200,{'content-type':'application/json'});
     response.end(JSON.stringify({id:'chatcmpl-local',object:'chat.completion',created:Math.floor(Date.now()/1000),model:'local-test',choices:[{index:0,message,finish_reason:toolCall?'tool_calls':'stop'}],usage:{prompt_tokens:30,completion_tokens:30,total_tokens:60}}));
