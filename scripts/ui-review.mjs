@@ -30,6 +30,11 @@ const modelServer = createServer(async (request,response)=>{
     response.end(JSON.stringify({created:Math.floor(Date.now()/1000),data:[{b64_json:png.toString('base64')}] }));
     return;
   }
+  if(JSON.stringify(payload.messages||[]).includes('故意失败')){
+    response.writeHead(502,{'content-type':'application/json'});
+    response.end(JSON.stringify({error:{message:'模拟上游 502，用于验证任务恢复'}}));
+    return;
+  }
   const latest=[...(payload.messages||[])].reverse().find(m=>m.role==='user');
   const userText=JSON.stringify(latest?.content||'');
   const hasToolReply=payload.messages?.some(m=>m.role==='tool');
@@ -45,8 +50,18 @@ const modelServer = createServer(async (request,response)=>{
   }
   const message=toolCall?{role:'assistant',content:null,tool_calls:[{id:'call_test_1',type:'function',function:toolCall}]}:
     {role:'assistant',content:payload.tools?.length?'模板操作完成，请查看右侧预览。':JSON.stringify(source)};
-  response.writeHead(200,{'content-type':'application/json'});
-  response.end(JSON.stringify({id:'chatcmpl-local',object:'chat.completion',created:Math.floor(Date.now()/1000),model:'local-test',choices:[{index:0,message,finish_reason:toolCall?'tool_calls':'stop'}],usage:{prompt_tokens:30,completion_tokens:30,total_tokens:60}}));
+  if(payload.stream){
+    if(userText.includes('切页验证'))await new Promise(resolve=>setTimeout(resolve,2500));
+    response.writeHead(200,{'content-type':'text/event-stream','cache-control':'no-cache','connection':'keep-alive'});
+    const emit=(delta,reason=null)=>response.write('data: '+JSON.stringify({id:'chatcmpl-local',object:'chat.completion.chunk',created:Math.floor(Date.now()/1000),model:'local-test',choices:[{index:0,delta,finish_reason:reason}]})+'\\n\\n');
+    if(toolCall)emit({role:'assistant',tool_calls:[{index:0,id:'call_test_1',type:'function',function:toolCall}]});
+    else emit({role:'assistant',content:message.content||''});
+    emit({},toolCall?'tool_calls':'stop');
+    response.end('data: [DONE]\\n\\n');
+  }else{
+    response.writeHead(200,{'content-type':'application/json'});
+    response.end(JSON.stringify({id:'chatcmpl-local',object:'chat.completion',created:Math.floor(Date.now()/1000),model:'local-test',choices:[{index:0,message,finish_reason:toolCall?'tool_calls':'stop'}],usage:{prompt_tokens:30,completion_tokens:30,total_tokens:60}}));
+  }
 });
 await new Promise(resolve=>modelServer.listen(44999,'127.0.0.1',resolve));
 
@@ -166,6 +181,20 @@ try {
   await page.getByRole('button',{name:'发送'}).click();
   await page.getByAltText('当前海报参考图').waitFor({timeout:90000});
   console.log('UI text prompt → Mastra image tool → generated reference picture ✓');
+  await page.getByRole('button',{name:'新建创作'}).click();
+  await page.getByRole('textbox',{name:'向设计 Agent 输入消息'}).fill('切页验证：请生成参考图，再转成模板');
+  await page.getByRole('button',{name:'发送'}).click();
+  await page.goto(`${origin}/templates`,{waitUntil:'networkidle'});
+  await page.goto(`${origin}/create`,{waitUntil:'networkidle'});
+  await page.getByAltText('当前海报参考图').waitFor({timeout:90000});
+  console.log('UI page navigation → server job continues → reconnect and restore ✓');
+  await page.getByRole('button',{name:'新建创作'}).click();
+  await page.getByRole('textbox',{name:'向设计 Agent 输入消息'}).fill('故意失败：测试会话持久保存');
+  await page.getByRole('button',{name:'发送'}).click();
+  await page.getByRole('alert').waitFor({timeout:30000});
+  await page.reload({waitUntil:'networkidle'});
+  await page.getByText('故意失败：测试会话持久保存').first().waitFor();
+  console.log('UI failed AI request → user message persists → reload ✓');
 
 
 
