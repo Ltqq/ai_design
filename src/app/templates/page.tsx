@@ -8,7 +8,8 @@ import { Heading,Loading,readJSON } from '@/components/ui';
 import type { TemplateRecord, TemplateVersion } from '@/types';
 export default function TemplatesPage(){
   const [items,setItems]=useState<TemplateRecord[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState('');
-  const [versions,setVersions]=useState<TemplateVersion[]>([]);\n  const [selected,setSelected]=useState<TemplateRecord|null>(null),[rename,setRename]=useState(''),[instruction,setInstruction]=useState(''),[busy,setBusy]=useState(''),[success,setSuccess]=useState('');
+  const [versions,setVersions]=useState<TemplateVersion[]>([]);
+  const [selected,setSelected]=useState<TemplateRecord|null>(null),[rename,setRename]=useState(''),[instruction,setInstruction]=useState(''),[busy,setBusy]=useState(''),[success,setSuccess]=useState('');
   const reload=async()=>{const data=await readJSON(await fetch('/api/templates',{cache:'no-store'}));setItems(data.templates.map((item:TemplateRecord)=>({...item,thumbnail:`${item.thumbnail}?v=${Date.now()}`})));};
   useEffect(()=>{reload().catch(err=>setError(err.message)).finally(()=>setLoading(false))},[]);
   const open=(item:TemplateRecord)=>{

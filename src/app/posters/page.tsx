@@ -14,7 +14,8 @@ function Editor(){
   const [manifest,setManifest]=useState<Manifest|null>(null),[models,setModels]=useState<ModelDiscount[]>([]);
   const [selected,setSelected]=useState<number[]>([]),[fixed,setFixed]=useState<Record<string,string>>({title:'热门模型 · 限时优惠',subtitle:'精选优质 AI 模型，超值折扣'});
   const [preview,setPreview]=useState(''),[busy,setBusy]=useState(''),[error,setError]=useState(''),[success,setSuccess]=useState(''),[filter,setFilter]=useState('');
-  const [history,setHistory]=useState<PosterRecord[]>([]);\n  const [ready,setReady]=useState(false);
+  const [history,setHistory]=useState<PosterRecord[]>([]);
+  const [ready,setReady]=useState(false);
   const visible=useMemo(()=>models.map((model,index)=>({...model,index})).filter(model=>model.name.toLowerCase().includes(filter.toLowerCase())),[models,filter]);
   const selectedModels=selected.map(index=>models[index]);
   const singles=manifest?.fields.filter(field=>field.type!=='list')||[];
