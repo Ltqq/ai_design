@@ -1,13 +1,14 @@
 'use client';
 import { LoaderCircle, ImagePlus, ArrowRight } from 'lucide-react';
 import { Button as MantineButton, Paper, Text, Title } from '@mantine/core';
+import type { ButtonProps, ElementProps } from '@mantine/core';
 import Link from 'next/link';
-import type { ComponentProps, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
-type ButtonProps = ComponentProps<typeof MantineButton>;
+interface ActionProps extends ButtonProps, ElementProps<'button', keyof ButtonProps> {}
 
 /** Bridge legacy page actions to Mantine while retaining existing interaction props. */
-export function ActionButton({className = '', children, ...props}: ButtonProps) {
+export function ActionButton({className = '', children, ...props}: ActionProps) {
   const tokens = className.split(/\s+/);
   const variant = tokens.includes('ghost') ? 'subtle' : tokens.includes('soft') ? 'light' : tokens.includes('danger') ? 'light' : tokens.includes('primary') ? 'filled' : 'default';
   const size = tokens.includes('tiny') ? 'xs' : 'sm';
