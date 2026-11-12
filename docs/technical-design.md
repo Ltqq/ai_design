@@ -324,3 +324,13 @@ SQLite `studio_states` 表按聊天会话 ID 存储 `reference_path`、`draft_id
 - AI 生成产物在入口校验实际 Handlebars 模型名称和折扣占位符；修改模板之前将原版存至 versions/，恢复时也保存恢复前版本。
 - poster_draft 保存海报编辑选择与文案；备份脚本同步备份版本目录。
 - 单进程内后台任务不会因浏览器切页取消，进程重启会标记 interrupted，由用户决定是否继续，未引入外部队列。
+
+## AI 代码编辑与计费实现（2026-11-12）
+
+- `templateAgent()` 输出初次完整 HTML/CSS/manifest；`createTemplateWorkflow` 只调用一次模板模型，后续通过 Playwright 本地渲染并保存草稿，不自动再次让模型完整重写。
+- `askTemplateEdits()` 让模型输出单个结构化 JSON `{edits:[{file:'html'|'css',oldText,newText}]}`；`applyTemplateEdits()` 确认旧片段在指定源码中唯一匹配，应用补丁并以 `sourceSchema` 校验，不扩大变更范围。无法安全定位时明确失败，不偷偷改走昂贵的完整重构。
+- `designStudioAgent` 添加文字直接生成模板、局部编辑与整体重构工具，使用 Mastra `createTool`。前端模板库默认局部编辑；另提供显式「整体重构 · 高成本」切换。
+- `/api/studio/save-template` 是工作台保存按钮的确定性操作，直接写模板和会话状态，不需要 LLM。
+- `model_usage` SQLite 表逐次保存操作、模型 ID、Token、缓存读取、图片张数、耗时及估算费用；`model_prices` 存储可选的人民币单价。主 Agent 与嵌套模板模型、生图模型各自采集，不将嵌套调用误认为顶层 usage 中已统计。
+- 费用基于**配置当时的单价**保存快照；无价格或用量则存 NULL。输入 Token 统计中包含缓存 Token 时，按「普通输入 = 输入总量 - 缓存读取」避免重复计价。reasoning Token 视为输出子集而不是额外相加。
+- GitHub CI 除常规类型检查、业务单元测试和生产构建外，使用本地 OpenAI 兼容服务来验证 UI 路径和模型调用次数，禁止在默认小改动时意外触发完整重写。
