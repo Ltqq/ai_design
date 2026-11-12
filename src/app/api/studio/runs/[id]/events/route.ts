@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { getStudioRun, readRunEvents } from '@/lib/storage';
+import { subscribeStudioRun } from '@/lib/studio-event-bus';
 import { withErrors } from '@/lib/http';
+import type { StudioEvent } from '@/types';
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
 
@@ -9,24 +11,29 @@ export const GET=withErrors(async(request:Request,{params}:{params:Promise<{id:s
   if(!getStudioRun(id))return Response.json({error:'任务不存在'},{status:404});
   let cursor=Number(request.headers.get('last-event-id')||new URL(request.url).searchParams.get('after')||0);
   const encoder=new TextEncoder();
-  let canceled=false;
+  let stopped=false;
+  let unsubscribe=()=>{};
   const stream=new ReadableStream<Uint8Array>({
     start(controller){
-      void (async()=>{
-      try{
-        while(!canceled && !request.signal.aborted){
-          for(const event of readRunEvents(id,cursor)){
-            controller.enqueue(encoder.encode(`id: ${event.id}\nevent: update\ndata: ${JSON.stringify(event)}\n\n`));
-            cursor=event.id;
-          }
-          if(getStudioRun(id)?.status!=='running')break;
-          await new Promise(resolve=>setTimeout(resolve,350));
-        }
-        if(!canceled)controller.close();
-      }catch(error){if(!canceled)controller.error(error)}
-      })();
+      const cleanup=()=>{unsubscribe();request.signal.removeEventListener('abort',abort)};
+      const close=()=>{
+        if(stopped)return;
+        stopped=true;cleanup();controller.close();
+      };
+      const abort=()=>close();
+      const emit=(event:StudioEvent)=>{
+        if(stopped||event.id<=cursor)return;
+        cursor=event.id;
+        controller.enqueue(encoder.encode(`id: ${event.id}\nevent: update\ndata: ${JSON.stringify(event)}\n\n`));
+        if(event.type==='finished')close();
+      };
+      // Subscribe before replay so events written during connection setup are not lost.
+      unsubscribe=subscribeStudioRun(id,emit);
+      request.signal.addEventListener('abort',abort,{once:true});
+      for(const event of readRunEvents(id,cursor))emit(event);
+      if(getStudioRun(id)?.status!=='running')close();
     },
-    cancel(){canceled=true;},
+    cancel(){stopped=true;unsubscribe();},
   });
   return new Response(stream,{headers:{'Content-Type':'text/event-stream; charset=utf-8','Cache-Control':'no-cache, no-transform','Connection':'keep-alive','X-Accel-Buffering':'no'}});
 });

@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3';
+import { broadcastStudioEvent } from '@/lib/studio-event-bus';
 import { mkdir, readFile, writeFile, cp, rm } from 'node:fs/promises';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
@@ -198,8 +199,11 @@ export function beginStudioRun(threadId:string|undefined, message:string, imageP
   return {threadId:id,runId};
 }
 export function recordStudioEvent(runId:string,type:string,payload:object) {
-  return Number(db().prepare('INSERT INTO studio_events(run_id,type,payload,created_at) VALUES(?,?,?,?)')
-    .run(runId,type,JSON.stringify(payload),new Date().toISOString()).lastInsertRowid);
+  const createdAt=new Date().toISOString();
+  const id=Number(db().prepare('INSERT INTO studio_events(run_id,type,payload,created_at) VALUES(?,?,?,?)')
+    .run(runId,type,JSON.stringify(payload),createdAt).lastInsertRowid);
+  broadcastStudioEvent({id,runId,type,payload:payload as Record<string,unknown>,createdAt});
+  return id;
 }
 export function readRunEvents(runId:string,after=0):StudioEvent[] {
   const rows=db().prepare('SELECT id,run_id,type,payload,created_at FROM studio_events WHERE run_id=? AND id>? ORDER BY id')

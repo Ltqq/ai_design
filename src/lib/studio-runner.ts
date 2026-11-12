@@ -1,7 +1,7 @@
 import { designStudioAgent } from '@/mastra/agents/design-studio';
 import { getConfig } from '@/lib/storage';
 import { recordModelUsage } from '@/lib/model-usage';
-import { beginStudioRun, finishStudioRun, getChat, getStudioState, readRunEvents, recordStudioEvent, referenceBytes, saveStudioState } from '@/lib/storage';
+import { beginStudioRun, finishStudioRun, getChat, getStudioState, recordStudioEvent, referenceBytes, saveStudioState } from '@/lib/storage';
 import type { StudioState } from '@/types';
 
 type ChatInput = {threadId?:string;message:string;imagePath?:string;width?:number;height?:number};
@@ -63,10 +63,10 @@ async function executeStudioRun(runId:string,threadId:string,design:StudioState)
       if(chunk.type==='text-delta'){
         const text=chunk.payload?.text||chunk.textDelta||'';
         answer+=text;pendingText+=text;
-        if(pendingText.length>=60 || Date.now()-lastFlush>160)flush();
+        if(pendingText.length>=20 || Date.now()-lastFlush>80)flush();
       }else if(chunk.type==='reasoning-delta'){
         pendingReasoning+=chunk.payload?.text||'';
-        if(pendingReasoning.length>=120 || Date.now()-lastFlush>250)flush();
+        if(pendingReasoning.length>=45 || Date.now()-lastFlush>120)flush();
       }else if(chunk.type==='tool-call'){
         flush();
         recordStudioEvent(runId,'tool',{toolName:chunk.payload?.toolName||'tool',callId:chunk.payload?.toolCallId||'',status:'running'});

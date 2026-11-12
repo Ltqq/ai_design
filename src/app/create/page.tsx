@@ -36,6 +36,27 @@ export default function CreatePage(){
   const fileRef=useRef<HTMLInputElement>(null);
   const scrollRef=useRef<HTMLDivElement>(null);
   const seenEvents=useRef<Set<number>>(new Set());
+  const queuedText=useRef('');
+  const animationFrame=useRef<number|null>(null);
+  const appendStreamText=(text:string)=>{
+    queuedText.current+=text;
+    if(animationFrame.current!==null)return;
+    const tick=()=>{
+      const pending=queuedText.current;
+      if(!pending){animationFrame.current=null;return}
+      const count=Math.min(12,Math.max(2,Math.ceil(pending.length/8)));
+      queuedText.current=pending.slice(count);
+      setLiveText(old=>old+pending.slice(0,count));
+      animationFrame.current=requestAnimationFrame(tick);
+    };
+    animationFrame.current=requestAnimationFrame(tick);
+  };
+  const resetStreamText=()=>{
+    queuedText.current='';
+    if(animationFrame.current!==null)cancelAnimationFrame(animationFrame.current);
+    animationFrame.current=null;
+    setLiveText('');
+  };
   const busy=run?.status==='running'||uploading||saving;
 
   const refreshSessions=async()=>{
@@ -48,11 +69,14 @@ export default function CreatePage(){
     setThreadId(id);setMessages(result.messages);setDesign(result.design);
     setRun(result.run||null);setEvents(result.events||[]);
     seenEvents.current=new Set((result.events||[]).map((event:StudioEvent)=>event.id));
-    setLiveText('');setTab(result.design.preview?'template':'reference');
+    resetStreamText();setTab(result.design.preview?'template':'reference');
     setAttachment('');setInput('');setError('');
   };
   useEffect(()=>{refreshSessions().then(list=>{if(list.length)return openSession(list[0].id)}).catch(e=>setError(e.message))},[]);
-  useEffect(()=>{scrollRef.current?.scrollTo({top:scrollRef.current.scrollHeight,behavior:'smooth'})},[messages,events,liveText]);
+  useEffect(()=>{
+    const viewport=scrollRef.current;
+    if(viewport)viewport.scrollTop=viewport.scrollHeight;
+  },[messages,events,liveText]);
   useEffect(()=>{
     if(run?.status!=='running')return;
     const activeId=run.id;
@@ -61,7 +85,7 @@ export default function CreatePage(){
       const event=JSON.parse((raw as MessageEvent).data) as StudioEvent;
       if(seenEvents.current.has(event.id))return;
       seenEvents.current.add(event.id);
-      if(event.type==='text')setLiveText(previous=>previous+String(event.payload.text||''));
+      if(event.type==='text')appendStreamText(String(event.payload.text||''));
       else {
         setEvents(previous=>[...previous,event]);
         if((event.type==='progress'||event.type==='tool'||event.type==='finished')&&event.payload.design){
@@ -82,7 +106,7 @@ export default function CreatePage(){
 
   const newSession=()=>{
     setThreadId('');setMessages([]);setRun(null);setEvents([]);setDesign(blankDesign);
-    setLiveText('');setTemplateName('');setAttachment('');setInput('');setTab('reference');setError('');setNotice('');
+    resetStreamText();setTemplateName('');setAttachment('');setInput('');setTab('reference');setError('');setNotice('');
     seenEvents.current=new Set();
   };
   const upload=async(file:File)=>{
@@ -98,7 +122,7 @@ export default function CreatePage(){
     if(!message||busy)return;
     const imagePath=attachment;
     const optimistic:ChatMessage={id:'pending',role:'user',content:message,imagePath:imagePath||null,createdAt:new Date().toISOString()};
-    setMessages(previous=>[...previous,optimistic]);setInput('');setAttachment('');setError('');setLiveText('');
+    setMessages(previous=>[...previous,optimistic]);setInput('');setAttachment('');setError('');resetStreamText();
     try{
       const result=await readJSON(await fetch('/api/studio',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({threadId:threadId||undefined,message,imagePath:imagePath||undefined,width:design.width,height:design.height})}));
       setThreadId(result.threadId);setDesign(result.design);setEvents([]);seenEvents.current=new Set();
