@@ -334,3 +334,10 @@ SQLite `studio_states` 表按聊天会话 ID 存储 `reference_path`、`draft_id
 - `model_usage` SQLite 表逐次保存操作、模型 ID、Token、缓存读取、图片张数、耗时及估算费用；`model_prices` 存储可选的人民币单价。主 Agent 与嵌套模板模型、生图模型各自采集，不将嵌套调用误认为顶层 usage 中已统计。
 - 费用基于**配置当时的单价**保存快照；无价格或用量则存 NULL。输入 Token 统计中包含缓存 Token 时，按「普通输入 = 输入总量 - 缓存读取」避免重复计价。reasoning Token 视为输出子集而不是额外相加。
 - GitHub CI 除常规类型检查、业务单元测试和生产构建外，使用本地 OpenAI 兼容服务来验证 UI 路径和模型调用次数，禁止在默认小改动时意外触发完整重写。
+
+## 精准编辑与静态图形实现细节（2026-11-12）
+
+- `src/lib/template-edits.ts` 校验旧源码中编辑片段的唯一性，并拒绝过大替换片段；`src/lib/design-operations.ts` 在本地完整重新渲染最终缩略图，但补丁保存只修改变动的源文件，原 manifest 不重写，模板正式修改前保留版本。
+- `src/lib/studio-event-bus.ts` 发送进程内模型事件到 SSE 订阅者。SQLite 是事实记录，订阅从数据库回放避免刷新/切页丢失事件，实时传输不依赖 350ms 轮询；前端 requestAnimationFrame 增量渲染文本。
+- Handlebars `icon` helper 渲染项目内预置静态 Lucide 风格 SVG（无需 React SSR、CDN、执行 JS），模板也允许直接包含静态 SVG；`renderPNG` 仅将 UUID 路径的持久化本地 reference 图片内联为 data URL，确保无外网也能准确截图。
+- 用户可选择专用 `reviewTemplate` 工具将当前 Playwright 截图及可选原参考图输入多模态局部编辑 Agent；生成 `edits` 后仍走同样的定位与内容校验，不自动进入整份 HTML/CSS 重构。成本归入 `template-visual-review`。
