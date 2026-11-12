@@ -2,13 +2,24 @@ import { Agent } from '@mastra/core/agent';
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 import { configuredModel } from '@/lib/model-provider';
-import { generateDesignImage, convertDesignToTemplate, reviseDesignTemplate } from '@/lib/design-operations';
+import { generateDesignImage, convertDesignToTemplate, createTemplateFromText, reviseDesignTemplate } from '@/lib/design-operations';
 import { renameTemplate, saveDraft } from '@/lib/storage';
 import type { StudioState } from '@/types';
 
 export function designStudioAgent(design: StudioState, onUpdate?: (stage:string)=>void) {
   const { config, provider } = configuredModel('vision');
   const tools = {
+    createTemplateFromText: createTool({
+      id:'create-template-from-text',
+      description:'直接按文字生成可复用 HTML/CSS 模板，不需要生成参考图片。用户没有提供参考图、只说要一个海报模板时优先调用此工具，省下生图和多模态图片理解费用。',
+      inputSchema:z.object({prompt:z.string().min(3)}),
+      execute:async ({prompt}:{prompt:string})=>{
+        const result=await createTemplateFromText(prompt,design.width,design.height,onUpdate);
+        design.draftId=result.draftId;design.templateId='';design.referencePath='';
+        onUpdate?.('文字 HTML 模板已生成');
+        return {success:true,draftId:result.draftId,preview:result.preview,fields:result.manifest.fields};
+      },
+    }),
     generateImage: createTool({
       id: 'generate-design-image',
       description: '根据用户描述生成全新海报参考图片。如果用户要求完成可复用模板，生成图片后继续调用 convertToTemplate。',
@@ -38,15 +49,28 @@ export function designStudioAgent(design: StudioState, onUpdate?: (stage:string)
     }),
     reviseTemplate: createTool({
       id: 'revise-template',
-      description: '用户要求“修改当前海报/变得更立体/调整布局、颜色”等，修改当前 HTML 模板并重新渲染预览。',
+      description: '默认局部修改当前 HTML/CSS。改变颜色、标签大小、阴影、局部布局、字体等均调用它。仅修改必要的片段，不重新生成整份源码。',
       inputSchema: z.object({ instruction: z.string().min(1).describe('具体设计修改意见') }),
       execute: async ({ instruction }: { instruction: string }) => {
         const kind = design.templateId ? 'templates' : 'drafts';
         const id = design.templateId || design.draftId;
         if (!id) return { success: false, message: '目前还没有 HTML 模板，请先把图片转换成模板。' };
-        const result = await reviseDesignTemplate(kind, id, instruction, onUpdate);
+        const result = await reviseDesignTemplate(kind, id, instruction, onUpdate, 'patch');
         onUpdate?.('模板修改已完成');
         return { success: true, preview: result.preview, fields: result.manifest.fields };
+      },
+    }),
+    redesignTemplate: createTool({
+      id:'redesign-template',
+      description:'仅当用户明确要求整体换风格、彻底重构模板，或局部编辑无法实现时调用。此操作会重新生成完整 HTML/CSS，费用明显高于局部编辑。',
+      inputSchema:z.object({instruction:z.string().min(1)}),
+      execute:async ({instruction}:{instruction:string})=>{
+        const kind=design.templateId?'templates':'drafts';
+        const id=design.templateId||design.draftId;
+        if(!id)return {success:false,message:'请先生成 HTML 模板'};
+        const result=await reviseDesignTemplate(kind,id,instruction,onUpdate,'redesign',design.referencePath);
+        onUpdate?.('模板整体重构已完成');
+        return {success:true,preview:result.preview};
       },
     }),
     saveTemplate: createTool({
@@ -68,7 +92,7 @@ export function designStudioAgent(design: StudioState, onUpdate?: (stage:string)
     model: provider.chatModel(config.modelId),
     instructions: `你是 AI Design 的海报创作 Agent，你不仅可以给建议，还能调用工具真正完成设计操作。
 当前工作状态：${JSON.stringify(design)}。
-用户需要海报时：先理解需求。若要从零设计图，调用 generateImage；若已提供参考图并要求做模板，调用 convertToTemplate；如果用户要从零完成“可复用模板”，先 generateImage 再 convertToTemplate。用户要求调整已有 HTML 模板，调用 reviseTemplate。仅在用户明确要求保存时才调用 saveTemplate。
+用户没有参考图而想直接制作可复用海报模板时，优先使用 createTemplateFromText，不要浪费一次生图。用户明确要求先生成参考图才调用 generateImage；参考图转模板用 convertToTemplate。默认用 reviseTemplate 对 HTML/CSS 做局部修改，不重新生成整份源码。只有用户明确要求全新风格、整体重构才使用 redesignTemplate。用户明确要求保存才调用 saveTemplate。首次模板生成后只做本地渲染，不自动发起第二次视觉精修。
 用户只是讨论创意、询问问题时正常回答，不调用工具。不要声称执行了没有调用的工具。工具执行后告诉用户得到的成果及下一步，不要输出内部文件源码。
 所有模板必须准确包含模型名称 name、折扣 discount 的可填充字段；Excel 只有这两列，不虚构价格或计算折扣。用简洁自然的中文交流。`,
     tools,

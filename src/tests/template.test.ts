@@ -1,6 +1,7 @@
 import { describe,expect,it } from 'vitest';
 import { bindFields,renderHTML } from '../lib/template';
 import { sourceSchema } from '../lib/schemas';
+import { applyTemplateEdits } from '../lib/template-edits';
 import type { TemplateSource } from '../types';
 
 const source:TemplateSource={
@@ -24,5 +25,24 @@ describe('确定性字段填充与真实 HTML',()=>{
     expect(html).toContain('&lt;script&gt;: 4折');
     expect(html.indexOf('&lt;script&gt;: 4折')).toBeLessThan(html.indexOf('kimi-k3: 5.7折'));
     expect(html).toContain('width:800px;height:1000px');
+  });
+});
+
+describe('局部 HTML/CSS 编辑',()=>{
+  const source={html:'<div>{{#each items}}<b>{{name}} <em class="discount">{{discount}}</em></b>{{/each}}</div>',
+    css:'.discount{color:purple;} .title{font-size:30px;}',manifest:{name:'示例',width:640,height:800,fields:[{key:'items' as const,label:'模型',type:'list' as const}],listFields:{items:[{key:'name',label:'模型名称'},{key:'discount',label:'折扣'}]}}};
+  it('仅替换目标 CSS，其余 HTML/manifest 保持完全一致',()=>{
+    const result=applyTemplateEdits(source,[{file:'css',oldText:'color:purple',newText:'color:orange'}]);
+    expect(result.css).toContain('color:orange');
+    expect(result.css).toContain('font-size:30px');
+    expect(result.html).toEqual(source.html);
+    expect(result.manifest).toEqual(source.manifest);
+  });
+  it('拒绝模糊或重复匹配，避免修改无关元素',()=>{
+    expect(()=>applyTemplateEdits(source,[{file:'css',oldText:'color:red',newText:'color:orange'}])).toThrow();
+    expect(()=>applyTemplateEdits({...source,css:'color:red;color:red'},[{file:'css',oldText:'color:red',newText:'color:blue'}])).toThrow();
+  });
+  it('拒绝删除模型与折扣动态字段的补丁',()=>{
+    expect(()=>applyTemplateEdits(source,[{file:'html',oldText:'{{discount}}',newText:'4折'}])).toThrow();
   });
 });
