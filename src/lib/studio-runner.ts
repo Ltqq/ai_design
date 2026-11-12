@@ -57,7 +57,7 @@ async function executeStudioRun(runId:string,threadId:string,design:StudioState)
     }
     recordStudioEvent(runId,'progress',{stage:'Agent 正在理解需求',design:studioView(design)});
     const agentStarted=Date.now();
-    const output=await designStudioAgent(design,onUpdate,runId).stream(messages,{maxSteps:7,toolCallConcurrency:1});
+    const output=await designStudioAgent(design,onUpdate,runId,/(整体|整张|全部|彻底|从头|重构|重新设计).*(换|重做|重构|重设|重新|风格|版式|布局)|(?:(整体|整张|全部|彻底|从头|重构|重新设计))/.test(history.at(-1)?.content||'')).stream(messages,{maxSteps:7,toolCallConcurrency:1});
     for await(const raw of output.fullStream){
       const chunk=raw as {type:string;payload?:{text?:string;toolName?:string;toolCallId?:string;error?:unknown;usage?:unknown};textDelta?:string};
       if(chunk.type==='text-delta'){

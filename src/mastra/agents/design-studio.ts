@@ -6,7 +6,7 @@ import { generateDesignImage, convertDesignToTemplate, createTemplateFromText, r
 import { renameTemplate, saveDraft } from '@/lib/storage';
 import type { StudioState } from '@/types';
 
-export function designStudioAgent(design: StudioState, onUpdate?: (stage:string)=>void,runId?:string) {
+export function designStudioAgent(design: StudioState, onUpdate?: (stage:string)=>void,runId?:string,allowRedesign=false) {
   const { config, provider } = configuredModel('vision');
   const tools = {
     createTemplateFromText: createTool({
@@ -65,6 +65,7 @@ export function designStudioAgent(design: StudioState, onUpdate?: (stage:string)
       description:'仅在用户明确要求视觉检查、对照截图纠正布局或点击视觉复查按钮时调用。多模态模型查看实际 HTML 截图、可选参考图，输出局部代码修补，不整体重写。会额外产生一次视觉模型调用费用。',
       inputSchema:z.object({instruction:z.string().min(1)}),
       execute:async ({instruction}:{instruction:string})=>{
+        if(!allowRedesign)return {success:false,message:'没有收到用户明确要求整体重构的指令，请使用局部编辑工具'};
         const kind=design.templateId?'templates':'drafts';
         const id=design.templateId||design.draftId;
         if(!id)return {success:false,message:'当前还没有 HTML 模板可检查'};

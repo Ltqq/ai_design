@@ -47,6 +47,10 @@ describe('局部 HTML/CSS 编辑',()=>{
     const css='.card{color:red;padding:10px;box-shadow:0 10px 30px black;}\n'.repeat(12);
     expect(()=>applyTemplateEdits({...source,css},[{file:'css',oldText:css,newText:css.replace('red','blue')}])).toThrow('大段源文件');
   });
+  it('拒绝用小片段替换为整份巨大 CSS 以绕过局部编辑',()=>{
+    const hugeCSS='.unrelated{background:linear-gradient(#111,#222);}'.repeat(110);
+    expect(()=>applyTemplateEdits(source,[{file:'css',oldText:'color:purple',newText:hugeCSS}])).toThrow('局部编辑不能');
+  });
   it('拒绝删除模型与折扣动态字段的补丁',()=>{
     expect(()=>applyTemplateEdits(source,[{file:'html',oldText:'{{discount}}',newText:'4折'}])).toThrow();
   });
