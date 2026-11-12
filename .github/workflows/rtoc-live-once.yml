@@ -9,7 +9,8 @@ on:
 jobs:
   probe:
     # This exact commit message authorizes the only live test.
-    if: github.event.head_commit.message == 'test: run one-time rtoc live api smoke'
+    if: >-
+      github.event.head_commit.message == 'test: run one-time rtoc live api smoke'
     runs-on: ubuntu-24.04
     timeout-minutes: 7
     permissions:
