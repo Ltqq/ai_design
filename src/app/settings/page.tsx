@@ -10,7 +10,7 @@ const blank={baseURL:'',modelId:'',apiKey:''};
 const noPrices:ModelPrices={inputPerMillion:null,outputPerMillion:null,cachedInputPerMillion:null,perImage:null};
 type UsageView={records:ModelUsageRecord[];summary:{knownCostCny:number;unpricedCalls:number;callCount:number;inputTokens:number;outputTokens:number;imageCount:number};prices:{vision:ModelPrices;image:ModelPrices}};
 const initialUsage:UsageView={records:[],summary:{knownCostCny:0,unpricedCalls:0,callCount:0,inputTokens:0,outputTokens:0,imageCount:0},prices:{vision:noPrices,image:noPrices}};
-const usageName:Record<string,string>={'agent-routing':'Agent 对话/路由','template-create':'首次生成 HTML','template-patch':'局部修改','template-redesign':'整体重构','image-generate':'生成参考图','capability-image-test':'生图能力测试','capability-vision-test':'多模态能力测试'};
+const usageName:Record<string,string>={'agent-routing':'Agent 对话/路由','template-create':'首次生成 HTML','template-patch':'局部修改','template-redesign':'整体重构','template-visual-review':'视觉复查','image-generate':'生成参考图','capability-image-test':'生图能力测试','capability-vision-test':'多模态能力测试'};
 
 export default function SettingsPage(){
   const [vision,setVision]=useState<Config>(blank),[image,setImage]=useState<Config>(blank),[busy,setBusy]=useState(''),[status,setStatus]=useState<Record<string,{text:string;ok:boolean}>>({});

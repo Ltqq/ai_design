@@ -34,12 +34,16 @@ export async function convertDesignToTemplate(referencePath:string,prompt:string
 export async function createTemplateFromText(prompt:string,width:number,height:number,onProgress?:(stage:string)=>void,runId?:string){
   return runTemplateWorkflow(prompt,width,height,undefined,onProgress,runId);
 }
-export async function reviseDesignTemplate(kind:'drafts'|'templates',id:string,instruction:string,onProgress?:(stage:string)=>void,mode:'patch'|'redesign'='patch',referencePath?:string,runId?:string){
+export async function reviseDesignTemplate(kind:'drafts'|'templates',id:string,instruction:string,onProgress?:(stage:string)=>void,mode:'patch'|'redesign'|'review'='patch',referencePath?:string,runId?:string){
   const previous=await readSource(kind,id);
   let source:TemplateSource;
-  if(mode==='patch'){
-    onProgress?.('AI 正在生成最小 HTML/CSS 编辑补丁');
-    const edits=await askTemplateEdits(previous,instruction,runId);
+  if(mode==='patch'||mode==='review'){
+    onProgress?.(mode==='review'?'AI 正在检查截图并生成局部修正补丁':'AI 正在生成最小 HTML/CSS 编辑补丁');
+    const screenshot=mode==='review'?await renderPNG(previous,previewFields(previous.manifest)):undefined;
+    const reference=mode==='review'&&referencePath?await referenceBytes(referencePath):undefined;
+    const edits=await askTemplateEdits(previous,instruction,runId,screenshot?{
+      screenshot,reference,mimeType:referencePath?.endsWith('.webp')?'image/webp':referencePath?.endsWith('.png')?'image/png':'image/jpeg'
+    }:undefined);
     source=applyTemplateEdits(previous,edits);
   }else{
     onProgress?.('AI 正在按要求整体重新设计模板');
@@ -50,10 +54,10 @@ export async function reviseDesignTemplate(kind:'drafts'|'templates',id:string,i
   onProgress?.('正在验证并渲染修改后的 HTML');
   const preview=await renderPNG(source,previewFields(source.manifest));
   if(kind==='templates')await snapshotTemplate(id);
-  const changedFiles=mode==='patch'
+  const changedFiles=mode!=='redesign'
     ?await writeSourcePatch(kind,id,previous,source,preview)
     :(await writeSource(kind,id,source,preview),['html','css','manifest']);
-  onProgress?.(mode==='patch'
+  onProgress?.(mode!=='redesign'
     ?`局部编辑已应用：仅修改 ${changedFiles.length?changedFiles.join('、'):'无'} 源文件；未执行整份重构`
     :'已完成整个 HTML/CSS 模板重构');
   return {preview:`/api/assets/${kind}/${id}/thumbnail.png?v=${Date.now()}`,manifest:source.manifest,mode,changedFiles};

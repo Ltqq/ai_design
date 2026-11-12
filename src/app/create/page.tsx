@@ -14,8 +14,8 @@ const ideas=[
   {title:'只生成设计图',prompt:'生成一张精致的 AI 模型促销海报参考图，深蓝紫色立体科技风，突出醒目的折扣展示区域。'},
   {title:'我有参考图片',prompt:'把我上传的参考图片转换成可复用的 HTML/CSS 模板，模型名称与折扣必须能够自动填充。'},
 ];
-const usageName:Record<string,string>={'agent-routing':'Agent 对话','template-create':'首次 HTML 生成','template-patch':'局部源码编辑','template-redesign':'整体重构','image-generate':'图片生成','capability-image-test':'生图能力测试','capability-vision-test':'多模态能力测试'};
-const tools:Record<string,string>={generateImage:'生成参考海报',createTemplateFromText:'文字直接生成 HTML',convertToTemplate:'图片转 HTML 模板',reviseTemplate:'局部编辑 HTML/CSS',redesignTemplate:'整体重构模板',saveTemplate:'保存到模板库'};
+const usageName:Record<string,string>={'agent-routing':'Agent 对话','template-create':'首次 HTML 生成','template-patch':'局部源码编辑','template-redesign':'整体重构','template-visual-review':'视觉复查','image-generate':'图片生成','capability-image-test':'生图能力测试','capability-vision-test':'多模态能力测试'};
+const tools:Record<string,string>={generateImage:'生成参考海报',createTemplateFromText:'文字直接生成 HTML',convertToTemplate:'图片转 HTML 模板',reviseTemplate:'局部编辑 HTML/CSS',redesignTemplate:'整体重构模板',reviewTemplate:'视觉复查与局部修正',saveTemplate:'保存到模板库'};
 
 export default function CreatePage(){
   const [sessions,setSessions]=useState<ChatSession[]>([]);
@@ -213,7 +213,10 @@ export default function CreatePage(){
         <Stack mt="lg" gap="sm"><Button fullWidth variant="light" leftSection={<WandSparkles size={16}/>} onClick={()=>send('请把当前参考图片转换为可复用的 HTML 海报模板，模型名称和折扣必须使用动态变量。')} disabled={!reference||!!busy}>转换为模板</Button>
           {design.templateId?<Group gap="xs" className="studio-saved-indicator"><Check size={15} color="#66dbb3"/><Text size="sm" c="teal.3">模板已保存，继续修改也可从模板库恢复旧版本。</Text></Group>:design.draftId?<><TextInput label="模板名称" placeholder="如：暗黑科技促销海报" value={templateName} onChange={event=>setTemplateName(event.currentTarget.value)}/><Button fullWidth leftSection={<Check size={16}/>} disabled={!templateName.trim()||!!busy} onClick={saveCurrentTemplate}>保存到模板库</Button></>:null}
           {design.templateId&&<Button component={Link} href={`/posters?template=${design.templateId}`} fullWidth color="teal" rightSection={<ArrowRight size={16}/>}>用 Excel 填充海报</Button>}
-          {design.preview&&<Text size="xs" c="dimmed" ta="center">不满意？直接告诉 Agent 怎么修改。模板历史版本可在模板库恢复。</Text>}
+          {design.preview&&<>
+            <Button fullWidth size="xs" variant="light" color="gray" disabled={!!busy} onClick={()=>send('请对当前 HTML 模板做视觉检查，对照实际渲染截图（如有参考图片也一起比较），只修正明显的遮挡、层次、布局和比例问题；保持原有设计与动态数据字段，使用局部补丁，不要整体重构。')}>AI 视觉复查 · 按需额外计费</Button>
+            <Text size="xs" c="dimmed" ta="center">不满意也可直接告诉 Agent 要修改的部分；旧版本可在模板库恢复。</Text>
+          </>}
         </Stack>
       </Paper>
     </div>

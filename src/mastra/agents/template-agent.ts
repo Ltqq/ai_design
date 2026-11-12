@@ -37,15 +37,25 @@ export async function askTemplateAgent(input:{prompt:string; image?:Buffer; comp
   recordModelUsage({runId:input.runId,kind:'vision',operation:input.operation||'template-create',modelId:getConfig('vision')?.modelId||'unknown',usage:result.usage,durationMs:Date.now()-started});
   return decodeSource(result.text);
 }
-export async function askTemplateEdits(previous:TemplateSource,instruction:string,runId?:string) {
+export async function askTemplateEdits(previous:TemplateSource,instruction:string,runId?:string,images?:{screenshot:Buffer;reference?:Buffer;mimeType?:string}) {
   const {config,provider}=configuredModel('vision');
   const agent=new Agent({id:'template-editor',name:'HTML/CSS 局部编辑',model:provider.chatModel(config.modelId),
     instructions:`只做用户明确要求的局部修改，不重写整份模板。你是一个精确的源文件编辑器。
 严格输出 JSON：{"edits":[{"file":"css","oldText":"旧源码中连续且唯一的一段","newText":"替换后的源码片段"}]}。
 file 只能为 html 或 css。oldText 必须与下面提供的源码逐字符一致、出现恰好一次。修改通常只需要 CSS；只有确实需要变动 DOM 结构时才改 HTML。不要重复输出整份 HTML/CSS，不修改 manifest、模型名称及折扣占位符。如果不能以局部替换完成，则明确提示需要整体重构，不要硬凑大段替换。`});
   const started=Date.now();
-  const result=await agent.generate([{role:'user',content:`修改要求：${instruction}\n--- template.html ---\n${previous.html}\n--- style.css ---\n${previous.css}`}]);
-  recordModelUsage({runId,kind:'vision',operation:'template-patch',modelId:config.modelId,usage:result.usage,durationMs:Date.now()-started});
+  const content:Array<{type:'text';text:string}|{type:'file';data:string;mediaType:string}>=[
+    {type:'text',text:`修改要求：${instruction}\n--- template.html ---\n${previous.html}\n--- style.css ---\n${previous.css}`}];
+  if(images){
+    content.push({type:'text',text:'下一张是当前 HTML 的真实浏览器截图，请检查文字遮挡、比例、视觉层次与排版。只输出能确定改善的最小修改。'});
+    content.push({type:'file',data:images.screenshot.toString('base64'),mediaType:'image/png'});
+    if(images.reference){
+      content.push({type:'text',text:'下一张是原始设计参考图。不要修改动态模型名称/折扣绑定，不要整体重建。'});
+      content.push({type:'file',data:images.reference.toString('base64'),mediaType:images.mimeType||'image/png'});
+    }
+  }
+  const result=await agent.generate([{role:'user',content}]);
+  recordModelUsage({runId,kind:'vision',operation:images?'template-visual-review':'template-patch',modelId:config.modelId,usage:result.usage,durationMs:Date.now()-started});
   const cleaned=result.text.trim().replace(/^```(?:json)?\s*/,'').replace(/\s*```$/,'');
   return editInstructionsSchema.parse(JSON.parse(cleaned)).edits;
 }
