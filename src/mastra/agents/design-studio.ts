@@ -57,7 +57,7 @@ export function designStudioAgent(design: StudioState, onUpdate?: (stage:string)
         if (!id) return { success: false, message: '目前还没有 HTML 模板，请先把图片转换成模板。' };
         const result = await reviseDesignTemplate(kind, id, instruction, onUpdate, 'patch',undefined,runId);
         onUpdate?.('模板修改已完成');
-        return { success: true, preview: result.preview, fields: result.manifest.fields };
+        return { success: true, editMode:'patch', changedFiles:result.changedFiles, preview: result.preview, fields: result.manifest.fields };
       },
     }),
     redesignTemplate: createTool({
@@ -70,7 +70,7 @@ export function designStudioAgent(design: StudioState, onUpdate?: (stage:string)
         if(!id)return {success:false,message:'请先生成 HTML 模板'};
         const result=await reviseDesignTemplate(kind,id,instruction,onUpdate,'redesign',design.referencePath,runId);
         onUpdate?.('模板整体重构已完成');
-        return {success:true,preview:result.preview};
+        return {success:true,editMode:'redesign',preview:result.preview};
       },
     }),
     saveTemplate: createTool({
@@ -92,7 +92,7 @@ export function designStudioAgent(design: StudioState, onUpdate?: (stage:string)
     model: provider.chatModel(config.modelId),
     instructions: `你是 AI Design 的海报创作 Agent，你不仅可以给建议，还能调用工具真正完成设计操作。
 当前工作状态：${JSON.stringify(design)}。
-用户没有参考图而想直接制作可复用海报模板时，优先使用 createTemplateFromText，不要浪费一次生图。用户明确要求先生成参考图才调用 generateImage；参考图转模板用 convertToTemplate。默认用 reviseTemplate 对 HTML/CSS 做局部修改，不重新生成整份源码。只有用户明确要求全新风格、整体重构才使用 redesignTemplate。用户明确要求保存才调用 saveTemplate。首次模板生成后只做本地渲染，不自动发起第二次视觉精修。
+用户没有参考图而想直接制作可复用海报模板时，优先使用 createTemplateFromText，不要浪费一次生图。用户明确要求先生成参考图才调用 generateImage；参考图转模板用 convertToTemplate。默认用 reviseTemplate 对 HTML/CSS 做局部修改，不重新生成整份源码。只有用户明确要求全新风格、整体重构才使用 redesignTemplate。用户只要说调整颜色、样式、局部位置、间距、排版，不要选整体重构。局部编辑无法精准定位时直接提示失败并继续澄清，禁止自动改用整体重构。用户明确要求保存才调用 saveTemplate。首次模板生成后只做本地渲染，不自动发起第二次视觉精修。
 用户只是讨论创意、询问问题时正常回答，不调用工具。不要声称执行了没有调用的工具。工具执行后告诉用户得到的成果及下一步，不要输出内部文件源码。
 所有模板必须准确包含模型名称 name、折扣 discount 的可填充字段；Excel 只有这两列，不虚构价格或计算折扣。用简洁自然的中文交流。`,
     tools,

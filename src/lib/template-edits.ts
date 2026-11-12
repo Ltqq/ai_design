@@ -16,6 +16,8 @@ export function applyTemplateEdits(source:TemplateSource, edits:z.infer<typeof e
   for(const edit of edits){
     const current=next[edit.file];
     const first=current.indexOf(edit.oldText);
+    if(edit.oldText.length>160 && edit.oldText.length>current.length*0.45)
+      throw new Error('局部编辑试图替换大段源文件，请改用整体重构');
     if(first===-1 || current.indexOf(edit.oldText,first+edit.oldText.length)!==-1)
       throw new Error('局部编辑定位失败或匹配不唯一，请重新描述修改位置，或选择整体重构');
     next[edit.file]=current.slice(0,first)+edit.newText+current.slice(first+edit.oldText.length);

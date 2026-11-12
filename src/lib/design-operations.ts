@@ -1,6 +1,6 @@
 import { generateImage } from 'ai';
 import { configuredModel } from '@/lib/model-provider';
-import { saveReference, referenceBytes, readSource, writeSource, snapshotTemplate } from '@/lib/storage';
+import { saveReference, referenceBytes, readSource, writeSource, writeSourcePatch, snapshotTemplate } from '@/lib/storage';
 import { createTemplateWorkflow } from '@/mastra/workflows/create-template';
 import { askTemplateAgent, askTemplateEdits } from '@/mastra/agents/template-agent';
 import { applyTemplateEdits } from '@/lib/template-edits';
@@ -50,6 +50,11 @@ export async function reviseDesignTemplate(kind:'drafts'|'templates',id:string,i
   onProgress?.('正在验证并渲染修改后的 HTML');
   const preview=await renderPNG(source,previewFields(source.manifest));
   if(kind==='templates')await snapshotTemplate(id);
-  await writeSource(kind,id,source,preview);
-  return {preview:`/api/assets/${kind}/${id}/thumbnail.png?v=${Date.now()}`,manifest:source.manifest};
+  const changedFiles=mode==='patch'
+    ?await writeSourcePatch(kind,id,previous,source,preview)
+    :(await writeSource(kind,id,source,preview),['html','css','manifest']);
+  onProgress?.(mode==='patch'
+    ?`局部编辑已应用：仅修改 ${changedFiles.length?changedFiles.join('、'):'无'} 源文件；未执行整份重构`
+    :'已完成整个 HTML/CSS 模板重构');
+  return {preview:`/api/assets/${kind}/${id}/thumbnail.png?v=${Date.now()}`,manifest:source.manifest,mode,changedFiles};
 }

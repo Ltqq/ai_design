@@ -62,6 +62,21 @@ export async function writeSource(kind: 'drafts'|'templates', id: string, source
     writeFile(path.join(folder, 'thumbnail.png'), thumbnail),
   ]);
 }
+/** For patch edits preserve untouched source files byte-for-byte. */
+export async function writeSourcePatch(kind:'drafts'|'templates',id:string,previous:TemplateSource,next:TemplateSource,thumbnail:Buffer) {
+  const folder=path.join(dataDir,kind,id);
+  const changed:Array<'html'|'css'>=[];
+  if(previous.html!==next.html){
+    await writeFile(path.join(folder,'template.html'),next.html);
+    changed.push('html');
+  }
+  if(previous.css!==next.css){
+    await writeFile(path.join(folder,'style.css'),next.css);
+    changed.push('css');
+  }
+  await writeFile(path.join(folder,'thumbnail.png'),thumbnail);
+  return changed;
+}
 export async function readSource(kind: 'drafts'|'templates', id: string): Promise<TemplateSource> {
   const folder = path.join(dataDir, kind, id);
   const [html, css, manifest] = await Promise.all([
