@@ -23,3 +23,6 @@ export type StudioRun = {id:string;threadId:string;status:'running'|'completed'|
 export type StudioEvent = {id:number;runId:string;type:string;payload:Record<string,unknown>;createdAt:string};
 export type TemplateVersion = {id:string;templateId:string;createdAt:string};
 export type PosterDraft = {templateId:string;selectedNames:string[];fixedFields:Record<string,string>};
+
+export type ModelPrices={inputPerMillion:number|null;outputPerMillion:number|null;cachedInputPerMillion:number|null;perImage:number|null};
+export type ModelUsageRecord={id:number;runId:string|null;kind:ModelKind;operation:string;modelId:string;inputTokens:number|null;outputTokens:number|null;cacheReadTokens:number|null;reasoningTokens:number|null;imageCount:number;durationMs:number;estimatedCostCny:number|null;createdAt:string};

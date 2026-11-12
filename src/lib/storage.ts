@@ -26,6 +26,9 @@ export function db() {
       CREATE INDEX IF NOT EXISTS studio_events_run ON studio_events(run_id,id);
       CREATE TABLE IF NOT EXISTS template_versions (id TEXT PRIMARY KEY, template_id TEXT NOT NULL, created_at TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS poster_draft (id INTEGER PRIMARY KEY CHECK(id=1), content TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS model_prices (kind TEXT PRIMARY KEY, input_per_million REAL, output_per_million REAL, cached_input_per_million REAL, per_image REAL);
+      CREATE TABLE IF NOT EXISTS model_usage (id INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT, kind TEXT NOT NULL, operation TEXT NOT NULL, model_id TEXT NOT NULL, input_tokens INTEGER, output_tokens INTEGER, cache_read_tokens INTEGER, reasoning_tokens INTEGER, image_count INTEGER NOT NULL, duration_ms INTEGER NOT NULL, estimated_cost_cny REAL, created_at TEXT NOT NULL);
+      CREATE INDEX IF NOT EXISTS model_usage_run ON model_usage(run_id,id);
     `);
     // In-process work cannot survive a Node process restart; mark interrupted runs explicitly.
     connection.prepare("UPDATE studio_runs SET status='interrupted', error='服务重启导致任务中断，请从已有设计继续' WHERE status='running'").run();
