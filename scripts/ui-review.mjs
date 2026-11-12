@@ -275,6 +275,7 @@ try {
 
   await page.close();
 } finally {
+  releaseDemoStream();
   await browser.close();
   await new Promise(resolve=>modelServer.close(resolve));
 }
