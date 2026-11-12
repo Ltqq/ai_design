@@ -66,7 +66,7 @@ const modelServer = createServer(async (request,response)=>{
     const emit=(delta,reason=null)=>response.write('data: '+JSON.stringify({id:'chatcmpl-local',object:'chat.completion.chunk',created:Math.floor(Date.now()/1000),model:'local-test',choices:[{index:0,delta,finish_reason:reason}]})+'\n\n');
     if(userText.includes('流式演示')&&!toolCall){
       emit({role:'assistant',content:'实时输出第一段'});
-      await new Promise(resolve=>{releaseDemoStream=resolve});
+      await Promise.race([new Promise(resolve=>{releaseDemoStream=resolve}),new Promise(resolve=>setTimeout(resolve,12000))]);
       emit({content:'，第二段也到了。'});
       emit({},'stop');
       response.end('data: [DONE]\n\n');
@@ -235,8 +235,11 @@ try {
   await page.getByRole('button',{name:'新建创作'}).click();
   await page.getByRole('textbox',{name:'向设计 Agent 输入消息'}).fill('流式演示：请按两段话回复，验证增量显示');
   await page.getByRole('button',{name:'发送'}).click();
+  console.log('Stream test: user message submitted');
   await page.getByText('运行中 · 切页不中断').waitFor({timeout:10000});
-  await page.getByText('实时输出第一段',{exact:false}).waitFor({timeout:15000});
+  console.log('Stream test: server run has started');
+  await page.getByText('实时输出第一段',{exact:false}).waitFor({timeout:8000});
+  console.log('Stream test: first partial text appeared before release');
   releaseDemoStream();
   await page.getByText('实时输出第一段，第二段也到了。',{exact:false}).waitFor({timeout:15000});
   console.log('UI partial text streamed before request completes ✓');
