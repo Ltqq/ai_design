@@ -40,7 +40,9 @@ const modelServer = createServer(async (request,response)=>{
   const hasToolReply=payload.messages?.some(m=>m.role==='tool');
   let toolCall;
   if(payload.tools?.length && !hasToolReply){
-    if(userText.includes('生成参考图')){
+    if(userText.includes('直接生成') && userText.includes('HTML')){
+      toolCall={name:'createTemplateFromText',arguments:JSON.stringify({prompt:'暗黑科技风，模型名称和折扣列表'})};
+    }else if(userText.includes('生成参考图')){
       toolCall={name:'generateImage',arguments:JSON.stringify({prompt:'高级科技风海报，立体设计'})};
     }else if(userText.includes('转换') || userText.includes('HTML 模板')){
       toolCall={name:'convertToTemplate',arguments:JSON.stringify({instructions:'依照参考图制作可填充模型名称、折扣的模板'})};
@@ -49,7 +51,8 @@ const modelServer = createServer(async (request,response)=>{
     }
   }
   const message=toolCall?{role:'assistant',content:null,tool_calls:[{id:'call_test_1',type:'function',function:toolCall}]}:
-    {role:'assistant',content:payload.tools?.length?'模板操作完成，请查看右侧预览。':JSON.stringify(source)};
+    {role:'assistant',content:payload.tools?.length?'模板操作完成，请查看右侧预览。':
+      userText.includes('修改要求：')?JSON.stringify({edits:[{file:'css',oldText:'padding:85px 74px',newText:'padding:80px 74px'}]}):JSON.stringify(source)};
   if(payload.stream){
     if(userText.includes('切页验证'))await new Promise(resolve=>setTimeout(resolve,2500));
     response.writeHead(200,{'content-type':'text/event-stream','cache-control':'no-cache','connection':'keep-alive'});
@@ -163,6 +166,13 @@ try {
   await page.reload({ waitUntil: 'networkidle' });
   if (await page.getByLabel('Model ID').first().inputValue() !== 'test-multimodal') throw new Error('UI model configuration did not persist');
   console.log('UI model settings save → reload ✓');
+  await page.getByLabel('输入价格').fill('2');
+  await page.getByLabel('输出价格').fill('8');
+  await page.getByRole('button',{name:'保存多模态单价'}).click();
+  await page.getByText('参考单价已保存').waitFor();
+  await page.reload({waitUntil:'networkidle'});
+  if(await page.getByLabel('输入价格').inputValue()!=='2')throw new Error('模型价格未持久化');
+  console.log('UI configurable model pricing persisted ✓');
   await page.getByLabel('API Base URL').nth(1).fill('http://127.0.0.1:44999/v1');
   await page.getByLabel('Model ID').nth(1).fill('test-image-generation');
   await page.getByLabel(/API Key/).nth(1).fill('local-image-test-key');
@@ -188,8 +198,8 @@ try {
   await page.goto(`${origin}/templates`,{waitUntil:'networkidle'});
   const savedCard=page.locator('.template-card').filter({hasText:'界面测试 · 已保存的设计模板'});
   await savedCard.getByRole('button',{name:/编辑/}).click();
-  await page.getByLabel('用自然语言微调设计').fill('让卡片更有立体感');
-  await page.getByRole('button',{name:'让 Agent 重新设计'}).click();
+  await page.getByLabel('用自然语言修改设计').fill('让卡片更有立体感');
+  await page.getByRole('button',{name:'只修改指定部分'}).click();
   await page.getByText('AI 设计修改完成').waitFor({timeout:90000});
   await page.locator('.template-card').filter({hasText:'界面测试 · 已保存的设计模板'}).getByRole('button',{name:/编辑/}).click();
   page.once('dialog',dialog=>dialog.accept());
@@ -202,6 +212,11 @@ try {
   await page.getByRole('button',{name:'发送'}).click();
   await page.getByAltText('当前海报参考图').waitFor({timeout:90000});
   console.log('UI text prompt → Mastra image tool → generated reference picture ✓');
+  await page.getByRole('button',{name:'新建创作'}).click();
+  await page.getByRole('textbox',{name:'向设计 Agent 输入消息'}).fill('直接生成一个完整的 HTML 模板，含模型折扣，不先生图');
+  await page.getByRole('button',{name:'发送'}).click();
+  await page.getByAltText('当前可复用 HTML 模板预览').waitFor({timeout:90000});
+  console.log('UI text → HTML template without image generation ✓');
   await page.getByRole('button',{name:'新建创作'}).click();
   await page.getByRole('textbox',{name:'向设计 Agent 输入消息'}).fill('切页验证：请生成参考图，再转成模板');
   await page.getByRole('button',{name:'发送'}).click();
