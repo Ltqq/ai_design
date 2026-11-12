@@ -2,7 +2,7 @@ import { createStep, createWorkflow } from '@mastra/core/workflows';
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import { referenceBytes, writeSource } from '@/lib/storage';
-import { askTemplateAgent } from '@/mastra/agents/template-agent';
+import { createTemplateFiles } from '@/mastra/agents/template-agent';
 import { renderPNG } from '@/lib/render';
 import { previewFields } from '@/lib/template';
 import { sourceSchema } from '@/lib/schemas';
@@ -16,7 +16,7 @@ const generateStep=createStep({
   execute:async ({inputData})=>{
     const image=inputData.referencePath?await referenceBytes(inputData.referencePath):undefined;
     const mimeType=inputData.referencePath?.endsWith('.webp')?'image/webp':inputData.referencePath?.endsWith('.png')?'image/png':'image/jpeg';
-    const source=await askTemplateAgent({prompt:inputData.prompt,image,mimeType,assetPath:inputData.referencePath,width:inputData.width,height:inputData.height,runId:inputData.runId,operation:'template-create'});
+    const source=await createTemplateFiles({prompt:inputData.prompt,image,mimeType,width:inputData.width,height:inputData.height,runId:inputData.runId});
     return {prompt:inputData.prompt,source};
   }
 });

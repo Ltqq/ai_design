@@ -2,8 +2,7 @@ import { generateImage } from 'ai';
 import { configuredModel } from '@/lib/model-provider';
 import { saveReference, referenceBytes, readSource, writeSource, writeSourcePatch, snapshotTemplate } from '@/lib/storage';
 import { createTemplateWorkflow } from '@/mastra/workflows/create-template';
-import { askTemplateAgent, askTemplateEdits } from '@/mastra/agents/template-agent';
-import { applyTemplateEdits } from '@/lib/template-edits';
+import { editTemplateFiles } from '@/mastra/agents/template-agent';
 import { recordModelUsage } from '@/lib/model-usage';
 import { renderPNG } from '@/lib/render';
 import { previewFields } from '@/lib/template';
@@ -36,21 +35,13 @@ export async function createTemplateFromText(prompt:string,width:number,height:n
 }
 export async function reviseDesignTemplate(kind:'drafts'|'templates',id:string,instruction:string,onProgress?:(stage:string)=>void,mode:'patch'|'redesign'|'review'='patch',referencePath?:string,runId?:string){
   const previous=await readSource(kind,id);
-  let source:TemplateSource;
-  if(mode==='patch'||mode==='review'){
-    onProgress?.(mode==='review'?'AI 正在检查截图并生成局部修正补丁':'AI 正在生成最小 HTML/CSS 编辑补丁');
-    const screenshot=mode==='review'?await renderPNG(previous,previewFields(previous.manifest)):undefined;
-    const reference=mode==='review'&&referencePath?await referenceBytes(referencePath):undefined;
-    const edits=await askTemplateEdits(previous,instruction,runId,screenshot?{
-      screenshot,reference,mimeType:referencePath?.endsWith('.webp')?'image/webp':referencePath?.endsWith('.png')?'image/png':'image/jpeg'
-    }:undefined);
-    source=applyTemplateEdits(previous,edits);
-  }else{
-    onProgress?.('AI 正在按要求整体重新设计模板');
-    const image=referencePath?await referenceBytes(referencePath):await renderPNG(previous,previewFields(previous.manifest));
-    source=await askTemplateAgent({prompt:instruction,image,mimeType:referencePath?.endsWith('.webp')?'image/webp':referencePath?.endsWith('.jpg')?'image/jpeg':'image/png',
-      width:previous.manifest.width,height:previous.manifest.height,previous,runId,operation:'template-redesign'});
-  }
+  onProgress?.(mode==='redesign'?'AI 正在重构模板源码':mode==='review'?'AI 正在对照截图修改源码':'AI 正在编辑模板源码');
+  const screenshot=await renderPNG(previous,previewFields(previous.manifest));
+  const reference=referencePath?await referenceBytes(referencePath):undefined;
+  const source=await editTemplateFiles(previous,{
+    prompt:instruction,mode,runId,onProgress,screenshot,reference,
+    mimeType:referencePath?.endsWith('.webp')?'image/webp':referencePath?.endsWith('.png')?'image/png':'image/jpeg',
+  });
   onProgress?.('正在验证并渲染修改后的 HTML');
   const preview=await renderPNG(source,previewFields(source.manifest));
   if(kind==='templates')await snapshotTemplate(id);
