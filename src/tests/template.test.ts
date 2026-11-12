@@ -2,6 +2,7 @@ import { describe,expect,it } from 'vitest';
 import { bindFields,renderHTML } from '../lib/template';
 import { sourceSchema } from '../lib/schemas';
 import { applyTemplateEdits } from '../lib/template-edits';
+import { writeFile,stat } from 'node:fs/promises';
 import type { TemplateSource } from '../types';
 
 const source:TemplateSource={
@@ -48,5 +49,16 @@ describe('局部 HTML/CSS 编辑',()=>{
   });
   it('拒绝删除模型与折扣动态字段的补丁',()=>{
     expect(()=>applyTemplateEdits(source,[{file:'html',oldText:'{{discount}}',newText:'4折'}])).toThrow();
+  });
+});
+
+describe('可复用 SVG 视觉元件',()=>{
+  it('通过本地 Lucide 图标 helper 渲染静态 SVG，避免外部脚本',()=>{
+    const iconSource={...source,html:'<div>{{{icon "sparkles"}}}{{#each items}}<b>{{name}} {{discount}}</b>{{/each}}</div>'};
+    const html=renderHTML(iconSource,{items:[{name:'kimi-k3',discount:'6折'}]});
+    expect(html).toContain('<svg');
+    expect(html).toContain('kimi-k3');
+    expect(html).not.toContain('<script');
+    expect(html).not.toContain('https://');
   });
 });

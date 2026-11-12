@@ -16,7 +16,7 @@ const generateStep=createStep({
   execute:async ({inputData})=>{
     const image=inputData.referencePath?await referenceBytes(inputData.referencePath):undefined;
     const mimeType=inputData.referencePath?.endsWith('.webp')?'image/webp':inputData.referencePath?.endsWith('.png')?'image/png':'image/jpeg';
-    const source=await askTemplateAgent({prompt:inputData.prompt,image,mimeType,width:inputData.width,height:inputData.height,runId:inputData.runId,operation:'template-create'});
+    const source=await askTemplateAgent({prompt:inputData.prompt,image,mimeType,assetPath:inputData.referencePath,width:inputData.width,height:inputData.height,runId:inputData.runId,operation:'template-create'});
     return {prompt:inputData.prompt,source};
   }
 });

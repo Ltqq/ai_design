@@ -1,4 +1,7 @@
 import Handlebars from 'handlebars';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { Sparkles, Zap, Cpu, Globe, ShieldCheck, Layers, ArrowRight } from 'lucide-react';
 import type { Manifest, PosterInput, TemplateSource } from '@/types';
 
 export function bindFields(manifest: Manifest, input: PosterInput): Record<string,unknown> {
@@ -9,9 +12,16 @@ export function bindFields(manifest: Manifest, input: PosterInput): Record<strin
   ]));
 }
 
+const icons={sparkles:Sparkles,zap:Zap,cpu:Cpu,globe:Globe,shield:ShieldCheck,layers:Layers,arrow:ArrowRight};
+const engine=Handlebars.create();
+engine.registerHelper('icon',(name:unknown)=>{
+  const Icon=typeof name==='string'?icons[name as keyof typeof icons]:undefined;
+  return new Handlebars.SafeString(Icon?renderToStaticMarkup(createElement(Icon,{size:24,strokeWidth:1.8,'aria-hidden':true})):'' );
+});
+
 export function renderHTML(source: TemplateSource, data: Record<string,unknown>) {
   const { width, height } = source.manifest;
-  const html = Handlebars.compile(source.html, { noEscape:false })(data);
+  const html = engine.compile(source.html, { noEscape:false })(data);
   return `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{box-sizing:border-box}html,body{margin:0;padding:0;width:${width}px;height:${height}px;overflow:hidden}body{font-family:Inter,"PingFang SC","Microsoft YaHei",sans-serif}${source.css}</style></head><body>${html}</body></html>`;
 }
 
