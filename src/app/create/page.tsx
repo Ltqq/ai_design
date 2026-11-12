@@ -14,6 +14,7 @@ const ideas=[
   {title:'只生成设计图',prompt:'生成一张精致的 AI 模型促销海报参考图，深蓝紫色立体科技风，突出醒目的折扣展示区域。'},
   {title:'我有参考图片',prompt:'把我上传的参考图片转换成可复用的 HTML/CSS 模板，模型名称与折扣必须能够自动填充。'},
 ];
+const usageName:Record<string,string>={'agent-routing':'Agent 对话','template-create':'首次 HTML 生成','template-patch':'局部源码编辑','template-redesign':'整体重构','image-generate':'图片生成'};
 const tools:Record<string,string>={generateImage:'生成参考海报',createTemplateFromText:'文字直接生成 HTML',convertToTemplate:'图片转 HTML 模板',reviseTemplate:'局部编辑 HTML/CSS',redesignTemplate:'整体重构模板',saveTemplate:'保存到模板库'};
 
 export default function CreatePage(){
@@ -160,7 +161,7 @@ export default function CreatePage(){
               <Group gap="xs" mb="sm"><Activity size={16}/><Text size="sm" fw={700}>Agent 执行记录</Text><Badge variant="light" color="gray">已持久保存</Badge></Group>
               <Stack gap={8}>{activity.slice(-18).map(item=><Group gap="sm" key={item.id} className="studio-event-row">
                 {item.type==='tool'?item.payload.status==='running'?<Clock3 size={15} color="#bba9ff"/>:<Check size={15} color="#66dbb3"/>:<Activity size={15} color="#9ca8cb"/>}
-                <Text size="xs">{item.type==='tool'?`${tools[String(item.payload.toolName)]||String(item.payload.toolName)} · ${item.payload.status==='running'?'正在执行':'完成'}`:item.type==='usage'?`Token：输入 ${item.payload.inputTokens??'-'} / 输出 ${item.payload.outputTokens??'-'}`:String(item.payload.stage||'处理中')}</Text>
+                <Text size="xs">{item.type==='tool'?`${tools[String(item.payload.toolName)]||String(item.payload.toolName)} · ${item.payload.status==='running'?'正在执行':'完成'}`:item.type==='usage'?`${usageName[String(item.payload.operation)]||String(item.payload.operation||'模型请求')} · 输入 ${item.payload.inputTokens??'未知'} / 输出 ${item.payload.outputTokens??'未知'} · ${item.payload.estimatedCostCny===null?'费用未知':`¥${Number(item.payload.estimatedCostCny).toFixed(4)}`}`:String(item.payload.stage||'处理中')}</Text>
               </Group>)}</Stack>
               {reasoning&&<details className="studio-reasoning"><summary><ChevronDown size={14}/>模型返回的思考内容</summary><Text size="xs" lh={1.7} style={{whiteSpace:'pre-wrap'}}>{reasoning}</Text></details>}
             </Paper>}

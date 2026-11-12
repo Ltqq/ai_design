@@ -55,3 +55,9 @@ export function listModelUsage(limit=50):ModelUsageRecord[]{
     .all(limit) as Array<{id:number;run_id:string|null;kind:ModelKind;operation:string;model_id:string;input_tokens:number|null;output_tokens:number|null;cache_read_tokens:number|null;reasoning_tokens:number|null;image_count:number;duration_ms:number;estimated_cost_cny:number|null;created_at:string}>;
   return rows.map(row=>({id:row.id,runId:row.run_id,kind:row.kind,operation:row.operation,modelId:row.model_id,inputTokens:row.input_tokens,outputTokens:row.output_tokens,cacheReadTokens:row.cache_read_tokens,reasoningTokens:row.reasoning_tokens,imageCount:row.image_count,durationMs:row.duration_ms,estimatedCostCny:row.estimated_cost_cny,createdAt:row.created_at}));
 }
+
+export function getModelUsageSummary(){
+  const row=db().prepare('SELECT COUNT(*) AS callCount, COALESCE(SUM(input_tokens),0) AS inputTokens, COALESCE(SUM(output_tokens),0) AS outputTokens, COALESCE(SUM(image_count),0) AS imageCount, COALESCE(SUM(estimated_cost_cny),0) AS knownCostCny, COUNT(*)-COUNT(estimated_cost_cny) AS unpricedCalls FROM model_usage')
+    .get() as {callCount:number;inputTokens:number;outputTokens:number;imageCount:number;knownCostCny:number;unpricedCalls:number};
+  return row;
+}
