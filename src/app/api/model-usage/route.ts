@@ -8,7 +8,7 @@ const input=z.object({kind:z.enum(['vision','image']),inputPerMillion:price,outp
 export const GET=withErrors(async()=>{
   const records=listModelUsage(100);
   return NextResponse.json({records,prices:{vision:getModelPrices('vision'),image:getModelPrices('image')},
-    summary:getModelUsageSummary()
+    summary:getModelUsageSummary()});
 });
 export const PUT=withErrors(async(request:Request)=>{
   const {kind,...prices}=input.parse(await request.json());
