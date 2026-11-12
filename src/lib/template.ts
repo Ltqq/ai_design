@@ -1,7 +1,4 @@
 import Handlebars from 'handlebars';
-import { createElement } from 'react';
-import { renderToStaticMarkup } from 'react-dom/server';
-import { Sparkles, Zap, Cpu, Globe, ShieldCheck, Layers, ArrowRight } from 'lucide-react';
 import type { Manifest, PosterInput, TemplateSource } from '@/types';
 
 export function bindFields(manifest: Manifest, input: PosterInput): Record<string,unknown> {
@@ -12,11 +9,22 @@ export function bindFields(manifest: Manifest, input: PosterInput): Record<strin
   ]));
 }
 
-const icons={sparkles:Sparkles,zap:Zap,cpu:Cpu,globe:Globe,shield:ShieldCheck,layers:Layers,arrow:ArrowRight};
+// Minimal static SVG shapes from the open-source Lucide icon set.
+// The helper emits only built-in, trusted vector markup; no client JS or CDN.
+const iconShapes:Record<string,string>={
+  sparkles:'<path d="m12 3 1.9 5.6L19.5 10.5l-5.6 1.9L12 18l-1.9-5.6L4.5 10.5l5.6-1.9z"/><path d="m19 17 .6 1.4L21 19l-1.4.6L19 21l-.6-1.4L17 19l1.4-.6z"/>',
+  zap:'<path d="m13 2-9 12h7l-1 8 10-12h-7z"/>',
+  cpu:'<rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3m6-3v3m-6 16v3m6-3v3M1 9h3m-3 6h3m16-6h3m-3 6h3"/>',
+  globe:'<circle cx="12" cy="12" r="10"/><path d="M2 12h20m-10-10c-6 5-6 15 0 20m0-20c6 5 6 15 0 20"/>',
+  shield:'<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/>',
+  layers:'<path d="m12 2 10 6-10 6L2 8z"/><path d="m2 12 10 6 10-6M2 16l10 6 10-6"/>',
+  arrow:'<path d="M5 12h14m-7-7 7 7-7 7"/>'
+};
 const engine=Handlebars.create();
 engine.registerHelper('icon',(name:unknown)=>{
-  const Icon=typeof name==='string'?icons[name as keyof typeof icons]:undefined;
-  return new Handlebars.SafeString(Icon?renderToStaticMarkup(createElement(Icon,{size:24,strokeWidth:1.8,'aria-hidden':true})):'' );
+  const shape=typeof name==='string'?iconShapes[name]:undefined;
+  return new Handlebars.SafeString(shape?
+    `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${shape}</svg>`:'');
 });
 
 export function renderHTML(source: TemplateSource, data: Record<string,unknown>) {
