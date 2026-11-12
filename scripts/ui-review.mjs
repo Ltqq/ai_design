@@ -23,6 +23,7 @@ const source = {
 };
 let templateGenerationCalls=0, templateEditCalls=0, imageGenerationCalls=0;
 let fileReadCalls=0,fileWriteCalls=0,fileEditCalls=0,screenshotContextCalls=0;
+let coderKey='',coderStep=0;
 let releaseDemoStream=()=>{};
 const modelServer = createServer(async (request,response)=>{
   let raw=''; for await(const part of request) raw+=part;
@@ -48,17 +49,20 @@ const modelServer = createServer(async (request,response)=>{
     if(userText.includes('创建尺寸'))templateGenerationCalls++;
     else templateEditCalls++;
   }
-  const toolReplyCount=(payload.messages||[]).filter(m=>m.role==='tool').length;
   let toolCall;
   if(codingTool){
-    // The model is mocked; the real Mastra file tools execute unchanged.
+    // The SDK may compact intermediate tool messages, so the offline provider
+    // tracks each deterministic coding sequence independently of message roles.
+    const key=toolNames.join(',')+'|'+userText.slice(0,250);
+    if(key!==coderKey){coderKey=key;coderStep=0}
     if(toolNames.includes('writeFile')){
-      if(toolReplyCount===0)toolCall={name:'writeFile',arguments:JSON.stringify({file:'template.html',content:source.html})};
-      else if(toolReplyCount===1)toolCall={name:'writeFile',arguments:JSON.stringify({file:'style.css',content:source.css})};
+      if(coderStep===0)toolCall={name:'writeFile',arguments:JSON.stringify({file:'template.html',content:source.html})};
+      else if(coderStep===1)toolCall={name:'writeFile',arguments:JSON.stringify({file:'style.css',content:source.css})};
     }else{
-      if(toolReplyCount===0)toolCall={name:'readFile',arguments:JSON.stringify({file:'style.css'})};
-      else if(toolReplyCount===1)toolCall={name:'editFile',arguments:JSON.stringify({file:'style.css',oldText:'padding:85px 74px',newText:'padding:80px 74px'})};
+      if(coderStep===0)toolCall={name:'readFile',arguments:JSON.stringify({file:'style.css'})};
+      else if(coderStep===1)toolCall={name:'editFile',arguments:JSON.stringify({file:'style.css',oldText:'padding:85px 74px',newText:'padding:80px 74px'})};
     }
+    coderStep++;
   }else if(payload.tools?.length && !hasToolReply){
     if(userText.includes('直接生成') && userText.includes('HTML')){
       toolCall={name:'createTemplateFromText',arguments:JSON.stringify({prompt:'暗黑科技风，模型名称和折扣列表'})};
