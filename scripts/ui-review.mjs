@@ -222,6 +222,7 @@ try {
   const templateCallsBeforeUpload=templateGenerationCalls;
   await page.getByRole('button',{name:'转换为模板'}).click();
   await page.getByAltText('当前可复用 HTML 模板预览').waitFor({timeout:150000});
+  console.log('Coder model calls:',templateGenerationCalls-templateCallsBeforeUpload,'file writes:',fileWriteCalls-fileWritesBeforeUpload);
   if(templateGenerationCalls-templateCallsBeforeUpload!==1 || fileWriteCalls-fileWritesBeforeUpload!==2)
     throw new Error('首次生成应通过模型文件工具分别写入 HTML 与 CSS，而非输出完整 JSON');
   console.log('UI upload → Mastra tool → rendered HTML template ✓');
