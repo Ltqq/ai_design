@@ -65,7 +65,6 @@ export function designStudioAgent(design: StudioState, onUpdate?: (stage:string)
       description:'仅在用户明确要求视觉检查、对照截图纠正布局或点击视觉复查按钮时调用。多模态模型查看实际 HTML 截图、可选参考图，输出局部代码修补，不整体重写。会额外产生一次视觉模型调用费用。',
       inputSchema:z.object({instruction:z.string().min(1)}),
       execute:async ({instruction}:{instruction:string})=>{
-        if(!allowRedesign)return {success:false,message:'没有收到用户明确要求整体重构的指令，请使用局部编辑工具'};
         const kind=design.templateId?'templates':'drafts';
         const id=design.templateId||design.draftId;
         if(!id)return {success:false,message:'当前还没有 HTML 模板可检查'};
@@ -79,6 +78,7 @@ export function designStudioAgent(design: StudioState, onUpdate?: (stage:string)
       description:'仅当用户明确要求整体换风格、彻底重构模板，或局部编辑无法实现时调用。此操作会重新生成完整 HTML/CSS，费用明显高于局部编辑。',
       inputSchema:z.object({instruction:z.string().min(1)}),
       execute:async ({instruction}:{instruction:string})=>{
+        if(!allowRedesign)return {success:false,message:'没有收到用户明确要求整体重构的指令，请使用局部编辑工具'};
         const kind=design.templateId?'templates':'drafts';
         const id=design.templateId||design.draftId;
         if(!id)return {success:false,message:'请先生成 HTML 模板'};

@@ -214,7 +214,7 @@ export default function CreatePage(){
           {design.templateId?<Group gap="xs" className="studio-saved-indicator"><Check size={15} color="#66dbb3"/><Text size="sm" c="teal.3">模板已保存，继续修改也可从模板库恢复旧版本。</Text></Group>:design.draftId?<><TextInput label="模板名称" placeholder="如：暗黑科技促销海报" value={templateName} onChange={event=>setTemplateName(event.currentTarget.value)}/><Button fullWidth leftSection={<Check size={16}/>} disabled={!templateName.trim()||!!busy} onClick={saveCurrentTemplate}>保存到模板库</Button></>:null}
           {design.templateId&&<Button component={Link} href={`/posters?template=${design.templateId}`} fullWidth color="teal" rightSection={<ArrowRight size={16}/>}>用 Excel 填充海报</Button>}
           {design.preview&&<>
-            <Button fullWidth size="xs" variant="light" color="gray" disabled={!!busy} onClick={()=>send('请对当前 HTML 模板做视觉检查，对照实际渲染截图（如有参考图片也一起比较），只修正明显的遮挡、层次、布局和比例问题；保持原有设计与动态数据字段，使用局部补丁，不要整体重构。')}>AI 视觉复查 · 按需额外计费</Button>
+            <Button fullWidth size="xs" variant="light" color="gray" disabled={!!busy} onClick={()=>send('请对当前 HTML 模板做视觉检查，对照实际渲染截图（如有参考图片也一起比较），只修正明显的遮挡、层次、布局和比例问题；保持原有设计与动态数据字段，使用局部补丁。')}>AI 视觉复查 · 按需额外计费</Button>
             <Text size="xs" c="dimmed" ta="center">不满意也可直接告诉 Agent 要修改的部分；旧版本可在模板库恢复。</Text>
           </>}
         </Stack>
