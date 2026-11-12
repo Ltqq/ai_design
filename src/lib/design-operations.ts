@@ -8,11 +8,11 @@ import { renderPNG } from '@/lib/render';
 import { previewFields } from '@/lib/template';
 import type { TemplateSource } from '@/types';
 
-export async function generateDesignImage(prompt:string,runId?:string) {
+export async function generateDesignImage(prompt:string,runId?:string,width=1080,height=1440) {
   const {config,provider}=configuredModel('image');
   const started=Date.now();
   const result=await generateImage({model:provider.imageModel(config.modelId),
-    prompt:`专业高级商业营销海报，${prompt}。精美立体质感、视觉层次丰富、清晰构图、广告设计品质。`});
+    prompt:`商业海报设计需求：${prompt}\n画面比例接近 ${width}:${height}，遵循用户指定的风格、主题和具体文字。请用有主视觉焦点、清晰文字层级、成熟构图、准确光影及合理留白的广告视觉设计，不要机械排列普通网页卡片；不要自行编造未提供的模型价格。`});
   recordModelUsage({runId,kind:'image',operation:'image-generate',modelId:config.modelId,usage:(result as {usage?:unknown}).usage,imageCount:result.images.length,durationMs:Date.now()-started});
   const image=result.images[0];
   const ext=image.mediaType==='image/jpeg'?'jpg':image.mediaType==='image/webp'?'webp':'png';

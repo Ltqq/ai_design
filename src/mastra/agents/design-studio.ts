@@ -26,7 +26,7 @@ export function designStudioAgent(design: StudioState, onUpdate?: (stage:string)
       inputSchema: z.object({ prompt: z.string().min(3).describe('海报的视觉风格和构图要求') }),
       execute: async ({ prompt }: { prompt: string }) => {
         onUpdate?.('AI 正在生成参考海报');
-        const referencePath = await generateDesignImage(prompt,runId);
+        const referencePath = await generateDesignImage(prompt,runId,design.width,design.height);
         design.referencePath = referencePath;
         design.draftId = '';
         design.templateId = '';

@@ -22,6 +22,7 @@ const source = {
   manifest: JSON.parse(await readFile('examples/tech-poster/manifest.json','utf8')),
 };
 let templateGenerationCalls=0, templateEditCalls=0, imageGenerationCalls=0;
+let fileReadCalls=0,fileWriteCalls=0,fileEditCalls=0,screenshotContextCalls=0;
 let releaseDemoStream=()=>{};
 const modelServer = createServer(async (request,response)=>{
   let raw=''; for await(const part of request) raw+=part;
@@ -71,6 +72,10 @@ const modelServer = createServer(async (request,response)=>{
       toolCall={name:'saveTemplate',arguments:JSON.stringify({name:'界面测试 · 已保存的设计模板'})};
     }
   }
+  if(toolCall?.name==='readFile')fileReadCalls++;
+  if(toolCall?.name==='writeFile')fileWriteCalls++;
+  if(toolCall?.name==='editFile')fileEditCalls++;
+  if(codingTool&&!hasToolReply&&userText.includes('真实浏览器里的截图'))screenshotContextCalls++;
   const message=toolCall?{role:'assistant',content:null,tool_calls:[{id:'call_test_1',type:'function',function:toolCall}]}:
     {role:'assistant',content:payload.tools?.length?'文件已操作，请查看预览。':JSON.stringify(source)};
   if(payload.stream){
@@ -213,10 +218,12 @@ try {
   await page.getByRole('button',{name:'上传参考图'}).click();
   await page.locator('input[type=file]').setInputFiles({name:'reference.png',mimeType:'image/png',buffer:Buffer.from(sampleImage)});
   await page.getByText('已添加参考图').waitFor();
+  const fileWritesBeforeUpload=fileWriteCalls;
   const templateCallsBeforeUpload=templateGenerationCalls;
   await page.getByRole('button',{name:'转换为模板'}).click();
   await page.getByAltText('当前可复用 HTML 模板预览').waitFor({timeout:150000});
-  if(templateGenerationCalls-templateCallsBeforeUpload!==1)throw new Error('初次模板转换调用了多次完整代码生成模型');
+  if(templateGenerationCalls-templateCallsBeforeUpload!==1 || fileWriteCalls-fileWritesBeforeUpload!==2)
+    throw new Error('首次生成应通过模型文件工具分别写入 HTML 与 CSS，而非输出完整 JSON');
   console.log('UI upload → Mastra tool → rendered HTML template ✓');
   await page.getByRole('textbox',{name:'模板名称'}).fill('界面测试 · 已保存的设计模板');
   await page.getByRole('button',{name:'保存到模板库'}).click();
@@ -229,12 +236,17 @@ try {
   const savedCard=page.locator('.template-card').filter({hasText:'界面测试 · 已保存的设计模板'});
   await savedCard.getByRole('button',{name:/编辑/}).click();
   await page.getByLabel('用自然语言修改设计').fill('让卡片更有立体感');
+  const fileReadsBeforeEdit=fileReadCalls;
+  const fileEditsBeforeEdit=fileEditCalls;
+  const screenshotCallsBeforeEdit=screenshotContextCalls;
   const templateCallsBeforeEdit=templateGenerationCalls;
   const patchCallsBeforeEdit=templateEditCalls;
   await page.getByRole('button',{name:'只修改指定部分'}).click();
   await page.getByText('AI 修改完成').waitFor({timeout:90000});
-  if(templateGenerationCalls!==templateCallsBeforeEdit || templateEditCalls!==patchCallsBeforeEdit+1)
-    throw new Error('局部编辑不应重走完整模板生成，且应恰好调用一次补丁模型');
+  if(templateGenerationCalls!==templateCallsBeforeEdit || templateEditCalls!==patchCallsBeforeEdit+1 ||
+      fileReadCalls<=fileReadsBeforeEdit || fileEditCalls!==fileEditsBeforeEdit+1 ||
+      screenshotContextCalls<=screenshotCallsBeforeEdit)
+    throw new Error('局部修改必须读取真实源文件、看到真实截图，再调用 editFile；不得走全量模板生成');
   await page.locator('.template-card').filter({hasText:'界面测试 · 已保存的设计模板'}).getByRole('button',{name:/编辑/}).click();
   page.once('dialog',dialog=>dialog.accept());
   await page.getByRole('button',{name:'恢复此版本'}).click();

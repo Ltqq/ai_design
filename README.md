@@ -143,3 +143,9 @@ GitHub Actions 运行上述检查以及浏览器页面冒烟测试；实际上�
 - 模板可以使用纯 CSS、静态内联 SVG、预置的 Lucide 开源 SVG 图形符号，以及 `/api/assets/references/<本地图片>` 装饰素材。后者在 Playwright 导出时自动转换成 data URL，不访问外网。禁止把包含动态文字的整个参考图当做静态背景。
 - 在工作台 HTML 模板预览区提供「AI 视觉复查 · 按需额外计费」，用户点击后模型查看实际浏览器截图与原始参考图（如有），返回局部补丁；**默认不自动收费运行**。对强制重设计时才使用整份源代码输出。
 - CI 新增：真实文件系统确认 CSS-only 编辑不会重写 HTML、实际 PNG 中本地图片可正确渲染、流式响应完成前页面能看到第一段文字、视觉复查工具路径。
+
+## 模板源码工作流
+
+模板模型现在通过 Mastra `readFile / writeFile / editFile` 工具操作隔离的真实 HTML/CSS 工作文件，不再要求一次性生成包含完整 HTML/CSS/manifest 的 JSON。首次创作分别写 `template.html`、`style.css`；`manifest.json` 保持由应用管理，模型仍需真实使用 `{{#each items}}`、`{{name}}` 和 `{{discount}}`。文件工具只能操作当前模板的两个源码文件。
+
+修改现有模板时，模型会收到 Playwright 当前预览的真实截图，并通过 `readFile` 理解现有代码、`editFile` 进行精确片段编辑。工作副本校验和渲染成功后才提交到原模板；用户每次看预览后自行决定是否继续修改或重新生图。可选 `renderPreview` 工具支持模型按需查看本次工作区的真实浏览器截图，不强制自动循环。
