@@ -40,11 +40,25 @@ const modelServer = createServer(async (request,response)=>{
   }
   const latest=[...(payload.messages||[])].reverse().find(m=>m.role==='user');
   const userText=JSON.stringify(latest?.content||'');
-  if(!payload.tools?.length && userText.includes('创建完整可填充数据的 HTML/CSS 模板'))templateGenerationCalls++;
-  if(!payload.tools?.length && userText.includes('修改要求：'))templateEditCalls++;
   const hasToolReply=payload.messages?.some(m=>m.role==='tool');
+  const toolNames=(payload.tools||[]).map(t=>t.function?.name||'');
+  const codingTool=toolNames.includes('writeFile')||toolNames.includes('editFile');
+  if(codingTool&&!hasToolReply){
+    if(userText.includes('创建尺寸'))templateGenerationCalls++;
+    else templateEditCalls++;
+  }
+  const toolReplyCount=(payload.messages||[]).filter(m=>m.role==='tool').length;
   let toolCall;
-  if(payload.tools?.length && !hasToolReply){
+  if(codingTool){
+    // The model is mocked; the real Mastra file tools execute unchanged.
+    if(toolNames.includes('writeFile')){
+      if(toolReplyCount===0)toolCall={name:'writeFile',arguments:JSON.stringify({file:'template.html',content:source.html})};
+      else if(toolReplyCount===1)toolCall={name:'writeFile',arguments:JSON.stringify({file:'style.css',content:source.css})};
+    }else{
+      if(toolReplyCount===0)toolCall={name:'readFile',arguments:JSON.stringify({file:'style.css'})};
+      else if(toolReplyCount===1)toolCall={name:'editFile',arguments:JSON.stringify({file:'style.css',oldText:'padding:85px 74px',newText:'padding:80px 74px'})};
+    }
+  }else if(payload.tools?.length && !hasToolReply){
     if(userText.includes('直接生成') && userText.includes('HTML')){
       toolCall={name:'createTemplateFromText',arguments:JSON.stringify({prompt:'暗黑科技风，模型名称和折扣列表'})};
     }else if(userText.includes('视觉检查')||userText.includes('视觉复查')){
@@ -58,8 +72,7 @@ const modelServer = createServer(async (request,response)=>{
     }
   }
   const message=toolCall?{role:'assistant',content:null,tool_calls:[{id:'call_test_1',type:'function',function:toolCall}]}:
-    {role:'assistant',content:payload.tools?.length?'模板操作完成，请查看右侧预览。':
-      userText.includes('修改要求：')?JSON.stringify({edits:[{file:'css',oldText:'padding:85px 74px',newText:'padding:80px 74px'}]}):JSON.stringify(source)};
+    {role:'assistant',content:payload.tools?.length?'文件已操作，请查看预览。':JSON.stringify(source)};
   if(payload.stream){
     if(userText.includes('切页验证'))await new Promise(resolve=>setTimeout(resolve,2500));
     response.writeHead(200,{'content-type':'text/event-stream','cache-control':'no-cache','connection':'keep-alive'});
