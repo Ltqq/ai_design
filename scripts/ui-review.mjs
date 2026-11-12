@@ -21,10 +21,12 @@ const source = {
   css: await readFile('examples/tech-poster/style.css','utf8'),
   manifest: JSON.parse(await readFile('examples/tech-poster/manifest.json','utf8')),
 };
+let templateGenerationCalls=0, templateEditCalls=0, imageGenerationCalls=0;
 const modelServer = createServer(async (request,response)=>{
   let raw=''; for await(const part of request) raw+=part;
   const payload=JSON.parse(raw);
   if(request.url?.includes('/images/generations')){
+    imageGenerationCalls++;
     const png=await readFile(path.join(dataDir,'drafts',draftId,'thumbnail.png'));
     response.writeHead(200,{'content-type':'application/json'});
     response.end(JSON.stringify({created:Math.floor(Date.now()/1000),data:[{b64_json:png.toString('base64')}] }));
@@ -37,6 +39,8 @@ const modelServer = createServer(async (request,response)=>{
   }
   const latest=[...(payload.messages||[])].reverse().find(m=>m.role==='user');
   const userText=JSON.stringify(latest?.content||'');
+  if(!payload.tools?.length && userText.includes('创建完整可填充数据的 HTML/CSS 模板'))templateGenerationCalls++;
+  if(!payload.tools?.length && userText.includes('修改要求：'))templateEditCalls++;
   const hasToolReply=payload.messages?.some(m=>m.role==='tool');
   let toolCall;
   if(payload.tools?.length && !hasToolReply){
@@ -185,8 +189,10 @@ try {
   await page.getByRole('button',{name:'上传参考图'}).click();
   await page.locator('input[type=file]').setInputFiles({name:'reference.png',mimeType:'image/png',buffer:Buffer.from(sampleImage)});
   await page.getByText('已添加参考图').waitFor();
+  const templateCallsBeforeUpload=templateGenerationCalls;
   await page.getByRole('button',{name:'转换为模板'}).click();
   await page.getByAltText('当前可复用 HTML 模板预览').waitFor({timeout:150000});
+  if(templateGenerationCalls-templateCallsBeforeUpload!==1)throw new Error('初次模板转换调用了多次完整代码生成模型');
   console.log('UI upload → Mastra tool → rendered HTML template ✓');
   await page.getByRole('textbox',{name:'模板名称'}).fill('界面测试 · 已保存的设计模板');
   await page.getByRole('button',{name:'保存到模板库'}).click();
@@ -199,8 +205,12 @@ try {
   const savedCard=page.locator('.template-card').filter({hasText:'界面测试 · 已保存的设计模板'});
   await savedCard.getByRole('button',{name:/编辑/}).click();
   await page.getByLabel('用自然语言修改设计').fill('让卡片更有立体感');
+  const templateCallsBeforeEdit=templateGenerationCalls;
+  const patchCallsBeforeEdit=templateEditCalls;
   await page.getByRole('button',{name:'只修改指定部分'}).click();
   await page.getByText('AI 修改完成').waitFor({timeout:90000});
+  if(templateGenerationCalls!==templateCallsBeforeEdit || templateEditCalls!==patchCallsBeforeEdit+1)
+    throw new Error('局部编辑不应重走完整模板生成，且应恰好调用一次补丁模型');
   await page.locator('.template-card').filter({hasText:'界面测试 · 已保存的设计模板'}).getByRole('button',{name:/编辑/}).click();
   page.once('dialog',dialog=>dialog.accept());
   await page.getByRole('button',{name:'恢复此版本'}).click();
@@ -213,9 +223,11 @@ try {
   await page.getByAltText('当前海报参考图').waitFor({timeout:90000});
   console.log('UI text prompt → Mastra image tool → generated reference picture ✓');
   await page.getByRole('button',{name:'新建创作'}).click();
+  const imageCallsBeforeDirectHtml=imageGenerationCalls;
   await page.getByRole('textbox',{name:'向设计 Agent 输入消息'}).fill('直接生成一个完整的 HTML 模板，含模型折扣，不先生图');
   await page.getByRole('button',{name:'发送'}).click();
   await page.getByAltText('当前可复用 HTML 模板预览').waitFor({timeout:90000});
+  if(imageGenerationCalls!==imageCallsBeforeDirectHtml)throw new Error('纯文字生成 HTML 不应先收费生图');
   console.log('UI text → HTML template without image generation ✓');
   await page.getByRole('button',{name:'新建创作'}).click();
   await page.getByRole('textbox',{name:'向设计 Agent 输入消息'}).fill('切页验证：请生成参考图，再转成模板');
