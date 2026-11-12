@@ -200,7 +200,7 @@ try {
   await savedCard.getByRole('button',{name:/编辑/}).click();
   await page.getByLabel('用自然语言修改设计').fill('让卡片更有立体感');
   await page.getByRole('button',{name:'只修改指定部分'}).click();
-  await page.getByText('AI 设计修改完成').waitFor({timeout:90000});
+  await page.getByText('AI 修改完成').waitFor({timeout:90000});
   await page.locator('.template-card').filter({hasText:'界面测试 · 已保存的设计模板'}).getByRole('button',{name:/编辑/}).click();
   page.once('dialog',dialog=>dialog.accept());
   await page.getByRole('button',{name:'恢复此版本'}).click();
