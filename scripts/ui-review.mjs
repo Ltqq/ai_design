@@ -227,6 +227,17 @@ try {
   await page.getByText('历史版本已恢复').waitFor({timeout:90000});
   console.log('UI revise saved template → browse and restore previous version ✓');
   await page.goto(`${origin}/create`,{waitUntil:'networkidle'});
+  await page.getByRole('button',{name:'AI 视觉复查 · 按需额外计费'}).click();
+  await page.getByText('已根据实际渲染截图局部修正模板').waitFor({timeout:90000});
+  console.log('UI optional visual review uses screenshot and scoped source patch ✓');
+  await page.getByRole('button',{name:'新建创作'}).click();
+  await page.getByRole('textbox',{name:'向设计 Agent 输入消息'}).fill('流式演示：请按两段话回复，验证增量显示');
+  await page.getByRole('button',{name:'发送'}).click();
+  await page.getByText('实时输出第一段',{exact:false}).waitFor({timeout:8000});
+  await page.getByText('运行中 · 切页不中断').waitFor();
+  await page.getByText('实时输出第一段，第二段也到了。',{exact:false}).waitFor({timeout:15000});
+  console.log('UI partial text streamed before request completes ✓');
+  await page.goto(`${origin}/create`,{waitUntil:'networkidle'});
   await page.getByRole('button',{name:'新建创作'}).click();
   await page.getByRole('textbox',{name:'向设计 Agent 输入消息'}).fill('请生成参考图，做一张科技风格的模型海报');
   await page.getByRole('button',{name:'发送'}).click();
