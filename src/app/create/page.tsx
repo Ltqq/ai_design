@@ -10,11 +10,11 @@ import type { ChatMessage, ChatSession, StudioState, StudioEvent, StudioRun } fr
 type DesignView=StudioState & {preview:string};
 const blankDesign:DesignView={referencePath:'',draftId:'',templateId:'',width:1080,height:1440,preview:''};
 const ideas=[
-  {title:'直接做模板',prompt:'帮我做一张 1080×1440 的 AI 模型促销海报，暗黑科技风、立体卡片，突出模型名称和折扣，最后转换成可复用的 HTML 模板。'},
+  {title:'直接做模板',prompt:'请直接用 HTML/CSS 制作一张 1080×1440 AI 模型促销海报模板，不要先调用图片生成模型。暗黑科技风、立体卡片，突出模型名称和折扣。'},
   {title:'只生成设计图',prompt:'生成一张精致的 AI 模型促销海报参考图，深蓝紫色立体科技风，突出醒目的折扣展示区域。'},
   {title:'我有参考图片',prompt:'把我上传的参考图片转换成可复用的 HTML/CSS 模板，模型名称与折扣必须能够自动填充。'},
 ];
-const tools:Record<string,string>={generateImage:'生成参考海报',convertToTemplate:'图片转 HTML 模板',reviseTemplate:'修改海报模板',saveTemplate:'保存到模板库'};
+const tools:Record<string,string>={generateImage:'生成参考海报',createTemplateFromText:'文字直接生成 HTML',convertToTemplate:'图片转 HTML 模板',reviseTemplate:'局部编辑 HTML/CSS',redesignTemplate:'整体重构模板',saveTemplate:'保存到模板库'};
 
 export default function CreatePage(){
   const [sessions,setSessions]=useState<ChatSession[]>([]);
@@ -29,11 +29,13 @@ export default function CreatePage(){
   const [templateName,setTemplateName]=useState('');
   const [tab,setTab]=useState<'reference'|'template'>('reference');
   const [uploading,setUploading]=useState(false);
+  const [saving,setSaving]=useState(false);
+  const [notice,setNotice]=useState('');
   const [error,setError]=useState('');
   const fileRef=useRef<HTMLInputElement>(null);
   const scrollRef=useRef<HTMLDivElement>(null);
   const seenEvents=useRef<Set<number>>(new Set());
-  const busy=run?.status==='running'||uploading;
+  const busy=run?.status==='running'||uploading||saving;
 
   const refreshSessions=async()=>{
     const result=await readJSON(await fetch('/api/studio',{cache:'no-store'}));
@@ -79,7 +81,7 @@ export default function CreatePage(){
 
   const newSession=()=>{
     setThreadId('');setMessages([]);setRun(null);setEvents([]);setDesign(blankDesign);
-    setLiveText('');setTemplateName('');setAttachment('');setInput('');setTab('reference');setError('');
+    setLiveText('');setTemplateName('');setAttachment('');setInput('');setTab('reference');setError('');setNotice('');
     seenEvents.current=new Set();
   };
   const upload=async(file:File)=>{
@@ -105,6 +107,18 @@ export default function CreatePage(){
       setMessages(previous=>previous.filter(item=>item.id!=='pending'));
       setInput(message);setAttachment(imagePath);setError(e instanceof Error?e.message:String(e));
     }
+  };
+  const saveCurrentTemplate=async()=>{
+    if(!threadId||!templateName.trim()||busy)return;
+    setSaving(true);setError('');setNotice('');
+    try{
+      const result=await readJSON(await fetch('/api/studio/save-template',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({threadId,name:templateName.trim()})}));
+      setDesign(result.design);
+      setTab('template');
+      setNotice('模板已保存。之后修改已有模板时，系统会自动保留旧版本。');
+    }catch(e){setError(e instanceof Error?e.message:String(e))}
+    finally{setSaving(false)}
   };
   const removeSession=async()=>{
     if(!threadId||run?.status==='running'||!confirm('删除当前对话及消息？已保存的模板仍会保留。'))return;
@@ -159,9 +173,10 @@ export default function CreatePage(){
           {run?.status==='running'&&!messages.length&&<div className="studio-thinking"><Loading text="任务正在后台执行…"/></div>}
         </ScrollArea>
         <div className="studio-composer">
+          {notice&&<Paper withBorder p="sm" mb="xs" c="teal" role="status"><Text size="xs">{notice}</Text></Paper>}
           {(error||latestError)&&<Paper withBorder p="sm" mb="xs" c="red" role="alert"><Group justify="space-between"><Text size="xs">{error||latestError}</Text>{latestError&&<Button size="xs" variant="light" leftSection={<RotateCcw size={13}/>} onClick={()=>{const last=[...messages].reverse().find(item=>item.role==='user');if(last){setInput(last.content);setAttachment(last.imagePath||'')}}}>恢复上次输入</Button>}</Group></Paper>}
           {attachment&&<Group gap="xs" mb="xs"><img src={attachment} alt="待发送的参考图" className="studio-attachment"/><Text size="xs" c="dimmed">已添加参考图</Text><ActionIcon aria-label="移除附件" size="sm" color="gray" variant="subtle" onClick={()=>setAttachment('')}><X size={15}/></ActionIcon></Group>}
-          <Textarea autosize minRows={2} maxRows={5} value={input} disabled={!!busy} onChange={event=>setInput(event.currentTarget.value)} placeholder="例如：生成一张科技风海报，再转成模板；或者把卡片调亮一点…" aria-label="向设计 Agent 输入消息" onKeyDown={event=>{if(event.key==='Enter'&&!event.shiftKey&&!event.nativeEvent.isComposing){event.preventDefault();send()}}}/>
+          <Textarea autosize minRows={2} maxRows={5} value={input} disabled={!!busy} onChange={event=>setInput(event.currentTarget.value)} placeholder="例如：直接做 HTML 模板；或生成参考图再转模板；也可以只调亮卡片…" aria-label="向设计 Agent 输入消息" onKeyDown={event=>{if(event.key==='Enter'&&!event.shiftKey&&!event.nativeEvent.isComposing){event.preventDefault();send()}}}/>
           <Group justify="space-between" mt="sm"><Group gap="xs"><input type="file" accept="image/png,image/jpeg,image/webp" hidden ref={fileRef} onChange={event=>{if(event.target.files?.[0])upload(event.target.files[0]);event.target.value=''}}/><Button size="xs" color="gray" variant="subtle" leftSection={<Paperclip size={15}/>} onClick={()=>fileRef.current?.click()} disabled={!!busy}>上传参考图</Button><Text c="dimmed" size="xs">Enter 发送</Text></Group><Button size="sm" rightSection={<Send size={15}/>} onClick={()=>send()} disabled={!!busy||(!input.trim()&&!attachment)}>发送</Button></Group>
         </div>
       </Paper>
@@ -171,7 +186,7 @@ export default function CreatePage(){
         <div className="studio-preview-stage">{visual?<img src={visual} alt={tab==='template'&&design.preview?'当前可复用 HTML 模板预览':'当前海报参考图'}/>:<Stack justify="center" align="center" gap="sm" h="100%" p="lg"><ImagePlus size={40} color="#887cbd"/><Text size="sm" ta="center" c="dimmed">图片或 HTML 模板生成后，会在这里显示。</Text></Stack>}</div>
         <Group gap="sm" mt="md" grow><NumberInput label="宽度 px" min={100} max={4000} value={design.width} onChange={value=>setDesign(current=>({...current,width:Number(value)||1080}))} size="xs" disabled={!!busy}/><NumberInput label="高度 px" min={100} max={4000} value={design.height} onChange={value=>setDesign(current=>({...current,height:Number(value)||1440}))} size="xs" disabled={!!busy}/></Group>
         <Stack mt="lg" gap="sm"><Button fullWidth variant="light" leftSection={<WandSparkles size={16}/>} onClick={()=>send('请把当前参考图片转换为可复用的 HTML 海报模板，模型名称和折扣必须使用动态变量。')} disabled={!reference||!!busy}>转换为模板</Button>
-          {design.templateId?<Group gap="xs" className="studio-saved-indicator"><Check size={15} color="#66dbb3"/><Text size="sm" c="teal.3">模板已保存，继续修改也可从模板库恢复旧版本。</Text></Group>:design.draftId?<><TextInput label="模板名称" placeholder="如：暗黑科技促销海报" value={templateName} onChange={event=>setTemplateName(event.currentTarget.value)}/><Button fullWidth leftSection={<Check size={16}/>} disabled={!templateName.trim()||!!busy} onClick={()=>send(`请把当前设计保存为模板，名字是「${templateName.trim()}」。`)}>保存到模板库</Button></>:null}
+          {design.templateId?<Group gap="xs" className="studio-saved-indicator"><Check size={15} color="#66dbb3"/><Text size="sm" c="teal.3">模板已保存，继续修改也可从模板库恢复旧版本。</Text></Group>:design.draftId?<><TextInput label="模板名称" placeholder="如：暗黑科技促销海报" value={templateName} onChange={event=>setTemplateName(event.currentTarget.value)}/><Button fullWidth leftSection={<Check size={16}/>} disabled={!templateName.trim()||!!busy} onClick={saveCurrentTemplate}>保存到模板库</Button></>:null}
           {design.templateId&&<Button component={Link} href={`/posters?template=${design.templateId}`} fullWidth color="teal" rightSection={<ArrowRight size={16}/>}>用 Excel 填充海报</Button>}
           {design.preview&&<Text size="xs" c="dimmed" ta="center">不满意？直接告诉 Agent 怎么修改。模板历史版本可在模板库恢复。</Text>}
         </Stack>

@@ -7,7 +7,7 @@ export const runtime='nodejs';
 export const maxDuration=300;
 export const POST=withErrors(async(request:Request,{params}:{params:Promise<{id:string}>})=>{
   const id=z.string().uuid().parse((await params).id);
-  const {instruction}=reviseSchema.parse(await request.json());
-  await reviseDesignTemplate('templates',id,instruction);
+  const {instruction,mode}=reviseSchema.extend({mode:z.enum(['patch','redesign']).default('patch')}).parse(await request.json());
+  await reviseDesignTemplate('templates',id,instruction,undefined,mode);
   return NextResponse.json({success:true});
 });
