@@ -7,7 +7,7 @@ import { renderPNG } from '@/lib/render';
 import { previewFields } from '@/lib/template';
 import { sourceSchema } from '@/lib/schemas';
 
-const inputSchema=z.object({referencePath:z.string().optional(),prompt:z.string(),width:z.number(),height:z.number()});
+const inputSchema=z.object({referencePath:z.string().optional(),prompt:z.string(),width:z.number(),height:z.number(),runId:z.string().optional()});
 const generatedSchema=z.object({prompt:z.string(),source:sourceSchema});
 const finalSchema=z.object({draftId:z.string(),preview:z.string(),manifest:sourceSchema.shape.manifest});
 
@@ -16,7 +16,7 @@ const generateStep=createStep({
   execute:async ({inputData})=>{
     const image=inputData.referencePath?await referenceBytes(inputData.referencePath):undefined;
     const mimeType=inputData.referencePath?.endsWith('.webp')?'image/webp':inputData.referencePath?.endsWith('.png')?'image/png':'image/jpeg';
-    const source=await askTemplateAgent({prompt:inputData.prompt,image,mimeType,width:inputData.width,height:inputData.height});
+    const source=await askTemplateAgent({prompt:inputData.prompt,image,mimeType,width:inputData.width,height:inputData.height,runId:inputData.runId,operation:'template-create'});
     return {prompt:inputData.prompt,source};
   }
 });

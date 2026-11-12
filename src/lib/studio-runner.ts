@@ -1,4 +1,6 @@
 import { designStudioAgent } from '@/mastra/agents/design-studio';
+import { getConfig } from '@/lib/storage';
+import { recordModelUsage } from '@/lib/model-usage';
 import { beginStudioRun, finishStudioRun, getChat, getStudioState, readRunEvents, recordStudioEvent, referenceBytes, saveStudioState } from '@/lib/storage';
 import type { StudioState } from '@/types';
 
@@ -54,7 +56,8 @@ async function executeStudioRun(runId:string,threadId:string,design:StudioState)
       }else messages.push({role:'user',content:item.content});
     }
     recordStudioEvent(runId,'progress',{stage:'Agent 正在理解需求',design:studioView(design)});
-    const output=await designStudioAgent(design,onUpdate).stream(messages,{maxSteps:7,toolCallConcurrency:1});
+    const agentStarted=Date.now();
+    const output=await designStudioAgent(design,onUpdate,runId).stream(messages,{maxSteps:7,toolCallConcurrency:1});
     for await(const raw of output.fullStream){
       const chunk=raw as {type:string;payload?:{text?:string;toolName?:string;toolCallId?:string;error?:unknown;usage?:unknown};textDelta?:string};
       if(chunk.type==='text-delta'){
@@ -78,7 +81,7 @@ async function executeStudioRun(runId:string,threadId:string,design:StudioState)
     flush();
     if(output.error)throw new Error(typeof output.error==='string'?output.error:output.error instanceof Error?output.error.message:JSON.stringify(output.error));
     const usage=await output.usage;
-    if(usage)recordStudioEvent(runId,'usage',{inputTokens:usage.inputTokens,outputTokens:usage.outputTokens,totalTokens:usage.totalTokens,reasoningTokens:usage.reasoningTokens});
+    if(usage)recordModelUsage({runId,kind:'vision',operation:'agent-routing',modelId:getConfig('vision')?.modelId||'unknown',usage,durationMs:Date.now()-agentStarted});
     saveStudioState(threadId,design);
     finishStudioRun(runId,answer.trim() || (design.draftId?'设计已更新，请查看右侧预览。':'操作完成，请查看右侧。'),'completed');
     recordStudioEvent(runId,'finished',{status:'completed',design:studioView(design)});

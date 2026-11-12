@@ -51,6 +51,15 @@ describe('SQLite 和模板真实持久化',()=>{
       await storage.restoreTemplateVersion(id,version.id);
       expect((await storage.readSource('templates',id)).html).toBe(original.html);
       expect(storage.listTemplateVersions(id)).toHaveLength(2);
+      const usage=await import('../lib/model-usage');
+      usage.saveModelPrices('vision',{inputPerMillion:2,outputPerMillion:8,cachedInputPerMillion:1,perImage:null});
+      usage.recordModelUsage({runId:task.runId,kind:'vision',operation:'template-patch',modelId:'test-vision',usage:{inputTokens:1000,outputTokens:400,inputTokenDetails:{cacheReadTokens:600}},durationMs:1900});
+      const entry=usage.listModelUsage(1)[0];
+      expect(entry.inputTokens).toBe(1000);
+      expect(entry.cacheReadTokens).toBe(600);
+      expect(entry.estimatedCostCny).toBeCloseTo((400*2+600*1+400*8)/1_000_000);
+      usage.recordModelUsage({kind:'image',operation:'image-generate',modelId:'test-image',imageCount:1,durationMs:10});
+      expect(usage.listModelUsage(1)[0].estimatedCostCny).toBeNull();
       storage.deleteChat(threadId);
       expect(storage.getStudioState(threadId)).toEqual({referencePath:'',draftId:'',templateId:'',width:1080,height:1440});
       expect(storage.getChat(threadId)).toHaveLength(0);
