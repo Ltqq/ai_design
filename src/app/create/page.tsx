@@ -14,7 +14,7 @@ const ideas=[
   {title:'只生成设计图',prompt:'生成一张精致的 AI 模型促销海报参考图，深蓝紫色立体科技风，突出醒目的折扣展示区域。'},
   {title:'我有参考图片',prompt:'把我上传的参考图片转换成可复用的 HTML/CSS 模板，模型名称与折扣必须能够自动填充。'},
 ];
-const usageName:Record<string,string>={'agent-routing':'Agent 对话','template-create':'首次 HTML 生成','template-patch':'局部源码编辑','template-redesign':'整体重构','image-generate':'图片生成'};
+const usageName:Record<string,string>={'agent-routing':'Agent 对话','template-create':'首次 HTML 生成','template-patch':'局部源码编辑','template-redesign':'整体重构','image-generate':'图片生成','capability-image-test':'生图能力测试','capability-vision-test':'多模态能力测试'};
 const tools:Record<string,string>={generateImage:'生成参考海报',createTemplateFromText:'文字直接生成 HTML',convertToTemplate:'图片转 HTML 模板',reviseTemplate:'局部编辑 HTML/CSS',redesignTemplate:'整体重构模板',saveTemplate:'保存到模板库'};
 
 export default function CreatePage(){
