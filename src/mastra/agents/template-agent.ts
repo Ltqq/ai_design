@@ -16,7 +16,7 @@ type FileName = 'template.html' | 'style.css';
 type Mode = 'create' | 'patch' | 'redesign' | 'review';
 type CoderInput = {
   prompt:string; mode:Mode; width:number; height:number; previous?:TemplateSource;
-  image?:Buffer; screenshot?:Buffer; mimeType?:string; reference?:Buffer;
+  image?:Buffer; assetPath?:string; screenshot?:Buffer; mimeType?:string; reference?:Buffer;
   runId?:string; onProgress?:(stage:string)=>void;
 };
 
@@ -110,7 +110,7 @@ async function runTemplateCoder(input:CoderInput):Promise<TemplateSource> {
       tools,
     });
     const request=isCreate
-      ?`创建尺寸 ${input.width}x${input.height} 的可复用营销海报。请分别调用 writeFile 写入 template.html 和 style.css。不要创建 manifest.json，系统已经管理了动态字段。设计要求：${input.prompt}`
+      ?`创建尺寸 ${input.width}x${input.height} 的可复用营销海报。请分别调用 writeFile 写入 template.html 和 style.css。不要创建 manifest.json，系统已经管理了动态字段。设计要求：${input.prompt}${input.assetPath?`。已保存的参考图片地址：${input.assetPath}。只有作为无动态文字的装饰素材才可引用，不要直接把完整带字海报当背景。`:''}`
       :isPatch
         ?`请先调用 readFile 读取当前源码，再用 editFile 只修改指定位置，不覆盖整份文件。结合当前真实截图判断布局。要求：${input.prompt}`
         :`请先调用 readFile 了解当前设计，再按要求整体重构 template.html 与 style.css，可用 writeFile 覆盖文件。要求：${input.prompt}`;

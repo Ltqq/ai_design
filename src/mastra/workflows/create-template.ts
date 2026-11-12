@@ -16,7 +16,7 @@ const generateStep=createStep({
   execute:async ({inputData})=>{
     const image=inputData.referencePath?await referenceBytes(inputData.referencePath):undefined;
     const mimeType=inputData.referencePath?.endsWith('.webp')?'image/webp':inputData.referencePath?.endsWith('.png')?'image/png':'image/jpeg';
-    const source=await createTemplateFiles({prompt:inputData.prompt,image,mimeType,width:inputData.width,height:inputData.height,runId:inputData.runId});
+    const source=await createTemplateFiles({prompt:inputData.prompt,image,mimeType,assetPath:inputData.referencePath,width:inputData.width,height:inputData.height,runId:inputData.runId});
     return {prompt:inputData.prompt,source};
   }
 });
