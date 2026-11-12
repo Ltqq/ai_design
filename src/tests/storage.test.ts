@@ -1,5 +1,5 @@
 import { describe,expect,it } from 'vitest';
-import { mkdtemp,readFile,rm } from 'node:fs/promises';
+import { mkdtemp,readFile,rm,stat,utimes } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -51,6 +51,15 @@ describe('SQLite 和模板真实持久化',()=>{
       await storage.restoreTemplateVersion(id,version.id);
       expect((await storage.readSource('templates',id)).html).toBe(original.html);
       expect(storage.listTemplateVersions(id)).toHaveLength(2);
+      const htmlPath=path.join(dir,'templates',id,'template.html');
+      const oldTime=new Date('2023-01-01T00:00:00Z');
+      await utimes(htmlPath,oldTime,oldTime);
+      const beforePatch=await storage.readSource('templates',id);
+      const changed=await storage.writeSourcePatch('templates',id,beforePatch,{...beforePatch,css:'h1{color:orange}'},Buffer.from('preview2'));
+      expect(changed).toEqual(['css']);
+      expect((await storage.readSource('templates',id)).html).toBe(beforePatch.html);
+      expect((await stat(htmlPath)).mtimeMs).toBeCloseTo(oldTime.getTime(),-2);
+      expect((await storage.readSource('templates',id)).css).toBe('h1{color:orange}');
       const usage=await import('../lib/model-usage');
       usage.saveModelPrices('vision',{inputPerMillion:2,outputPerMillion:8,cachedInputPerMillion:1,perImage:null});
       usage.recordModelUsage({runId:task.runId,kind:'vision',operation:'template-patch',modelId:'test-vision',usage:{inputTokens:1000,outputTokens:400,inputTokenDetails:{cacheReadTokens:600}},durationMs:1900});
