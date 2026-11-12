@@ -22,6 +22,7 @@ const source = {
   manifest: JSON.parse(await readFile('examples/tech-poster/manifest.json','utf8')),
 };
 let templateGenerationCalls=0, templateEditCalls=0, imageGenerationCalls=0;
+let releaseDemoStream=()=>{};
 const modelServer = createServer(async (request,response)=>{
   let raw=''; for await(const part of request) raw+=part;
   const payload=JSON.parse(raw);
@@ -65,7 +66,7 @@ const modelServer = createServer(async (request,response)=>{
     const emit=(delta,reason=null)=>response.write('data: '+JSON.stringify({id:'chatcmpl-local',object:'chat.completion.chunk',created:Math.floor(Date.now()/1000),model:'local-test',choices:[{index:0,delta,finish_reason:reason}]})+'\n\n');
     if(userText.includes('流式演示')&&!toolCall){
       emit({role:'assistant',content:'实时输出第一段'});
-      await new Promise(resolve=>setTimeout(resolve,1300));
+      await new Promise(resolve=>{releaseDemoStream=resolve});
       emit({content:'，第二段也到了。'});
       emit({},'stop');
       response.end('data: [DONE]\n\n');
@@ -229,12 +230,14 @@ try {
   await page.goto(`${origin}/create`,{waitUntil:'networkidle'});
   await page.getByRole('button',{name:'AI 视觉复查 · 按需额外计费'}).click();
   await page.getByText('已根据实际渲染截图局部修正模板').waitFor({timeout:90000});
+  await page.getByText('就绪',{exact:true}).waitFor({timeout:15000});
   console.log('UI optional visual review uses screenshot and scoped source patch ✓');
   await page.getByRole('button',{name:'新建创作'}).click();
   await page.getByRole('textbox',{name:'向设计 Agent 输入消息'}).fill('流式演示：请按两段话回复，验证增量显示');
   await page.getByRole('button',{name:'发送'}).click();
-  await page.getByText('实时输出第一段',{exact:false}).waitFor({timeout:8000});
-  await page.getByText('运行中 · 切页不中断').waitFor();
+  await page.getByText('运行中 · 切页不中断').waitFor({timeout:10000});
+  await page.getByText('实时输出第一段',{exact:false}).waitFor({timeout:15000});
+  releaseDemoStream();
   await page.getByText('实时输出第一段，第二段也到了。',{exact:false}).waitFor({timeout:15000});
   console.log('UI partial text streamed before request completes ✓');
   await page.goto(`${origin}/create`,{waitUntil:'networkidle'});
