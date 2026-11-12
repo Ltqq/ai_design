@@ -30,10 +30,15 @@ async function executeStudioRun(runId:string,threadId:string,design:StudioState)
   let pendingText='';
   let pendingReasoning='';
   let lastFlush=Date.now();
+  let flushTimer:ReturnType<typeof setTimeout>|null=null;
   const flush=()=>{
+    if(flushTimer!==null){clearTimeout(flushTimer);flushTimer=null;}
     if(pendingText){recordStudioEvent(runId,'text',{text:pendingText});pendingText='';}
     if(pendingReasoning){recordStudioEvent(runId,'reasoning',{text:pendingReasoning});pendingReasoning='';}
     lastFlush=Date.now();
+  };
+  const scheduleFlush=()=>{
+    if(flushTimer===null)flushTimer=setTimeout(flush,65);
   };
   const onUpdate=(stage:string)=>{
     flush();
@@ -64,9 +69,11 @@ async function executeStudioRun(runId:string,threadId:string,design:StudioState)
         const text=chunk.payload?.text||chunk.textDelta||'';
         answer+=text;pendingText+=text;
         if(pendingText.length>=20 || Date.now()-lastFlush>80)flush();
+        else scheduleFlush();
       }else if(chunk.type==='reasoning-delta'){
         pendingReasoning+=chunk.payload?.text||'';
         if(pendingReasoning.length>=45 || Date.now()-lastFlush>120)flush();
+        else scheduleFlush();
       }else if(chunk.type==='tool-call'){
         flush();
         recordStudioEvent(runId,'tool',{toolName:chunk.payload?.toolName||'tool',callId:chunk.payload?.toolCallId||'',status:'running'});
