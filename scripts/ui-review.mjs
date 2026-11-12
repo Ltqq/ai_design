@@ -46,6 +46,8 @@ const modelServer = createServer(async (request,response)=>{
   if(payload.tools?.length && !hasToolReply){
     if(userText.includes('直接生成') && userText.includes('HTML')){
       toolCall={name:'createTemplateFromText',arguments:JSON.stringify({prompt:'暗黑科技风，模型名称和折扣列表'})};
+    }else if(userText.includes('视觉检查')||userText.includes('视觉复查')){
+      toolCall={name:'reviewTemplate',arguments:JSON.stringify({instruction:'只修正明显视觉问题并保留动态变量'})};
     }else if(userText.includes('生成参考图')){
       toolCall={name:'generateImage',arguments:JSON.stringify({prompt:'高级科技风海报，立体设计'})};
     }else if(userText.includes('转换') || userText.includes('HTML 模板')){
@@ -61,6 +63,14 @@ const modelServer = createServer(async (request,response)=>{
     if(userText.includes('切页验证'))await new Promise(resolve=>setTimeout(resolve,2500));
     response.writeHead(200,{'content-type':'text/event-stream','cache-control':'no-cache','connection':'keep-alive'});
     const emit=(delta,reason=null)=>response.write('data: '+JSON.stringify({id:'chatcmpl-local',object:'chat.completion.chunk',created:Math.floor(Date.now()/1000),model:'local-test',choices:[{index:0,delta,finish_reason:reason}]})+'\n\n');
+    if(userText.includes('流式演示')&&!toolCall){
+      emit({role:'assistant',content:'实时输出第一段'});
+      await new Promise(resolve=>setTimeout(resolve,1300));
+      emit({content:'，第二段也到了。'});
+      emit({},'stop');
+      response.end('data: [DONE]\n\n');
+      return;
+    }
     if(toolCall)emit({role:'assistant',tool_calls:[{index:0,id:'call_test_1',type:'function',function:toolCall}]});
     else emit({role:'assistant',content:message.content||''});
     emit({},toolCall?'tool_calls':'stop');
