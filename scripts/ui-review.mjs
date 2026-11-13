@@ -276,6 +276,14 @@ try {
   console.log('UI partial text streamed before request completes ✓');
   await page.goto(`${origin}/create`,{waitUntil:'networkidle'});
   await page.getByRole('button',{name:'新建创作'}).click();
+  await page.getByRole('textbox',{name:'向设计 Agent 输入消息'}).fill('流式演示：测试停止生成');
+  await page.getByRole('button',{name:'发送'}).click();
+  await page.getByText('实时输出第一段',{exact:false}).waitFor({timeout:9000});
+  await page.getByRole('button',{name:'停止生成'}).click();
+  await page.getByText('已停止',{exact:true}).waitFor({timeout:15000});
+  releaseDemoStream();
+  console.log('UI stop → real Agent AbortSignal → cancelled task ✓');
+  await page.getByRole('button',{name:'新建创作'}).click();
   await page.getByRole('textbox',{name:'向设计 Agent 输入消息'}).fill('请生成参考图，做一张科技风格的模型海报');
   await page.getByRole('button',{name:'发送'}).click();
   await page.getByAltText('当前海报参考图').waitFor({timeout:90000});
@@ -301,6 +309,10 @@ try {
   await page.reload({waitUntil:'networkidle'});
   await page.getByText('故意失败：测试会话持久保存').first().waitFor();
   console.log('UI failed AI request → user message persists → reload ✓');
+  page.once('dialog',dialog=>dialog.accept());
+  await page.getByRole('button',{name:'删除此对话'}).click();
+  await page.getByText('故意失败：测试会话持久保存').first().waitFor({state:'detached'});
+  console.log('UI delete chat → SQLite and Mastra memory cleanup ✓');
 
 
 

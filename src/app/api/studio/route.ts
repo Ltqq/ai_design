@@ -4,6 +4,7 @@ import { chatInputSchema } from '@/lib/schemas';
 import { withErrors } from '@/lib/http';
 import { getChat,getCurrentStudioRun,getStudioState,listChats,recentStudioEvents,deleteChat } from '@/lib/storage';
 import { startStudioRun, studioView } from '@/lib/studio-runner';
+import { studioMemory } from '@/lib/agent-memory';
 
 export const runtime='nodejs';
 const studioInputSchema=chatInputSchema.extend({width:z.number().int().min(100).max(4000).optional(),height:z.number().int().min(100).max(4000).optional()});
@@ -23,6 +24,7 @@ export const DELETE=withErrors(async(request:Request)=>{
   const id=threadSchema.parse(new URL(request.url).searchParams.get('threadId'));
   const run=getCurrentStudioRun(id);
   if(run?.status==='running')return NextResponse.json({error:'任务正在执行，请完成后再删除对话'},{status:409});
+  await studioMemory().deleteThread(id);
   deleteChat(id);
   return NextResponse.json({success:true});
 });
