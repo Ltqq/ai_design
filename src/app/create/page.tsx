@@ -133,6 +133,13 @@ export default function CreatePage(){
       setInput(message);setAttachment(imagePath);setError(e instanceof Error?e.message:String(e));
     }
   };
+  const stopGeneration=async()=>{
+    if(!run||run.status!=='running')return;
+    try{
+      await readJSON(await fetch(`/api/studio/runs/${run.id}/cancel`,{method:'POST'}));
+      setNotice('正在停止生成，已完成的模板会保留。');
+    }catch(e){setError(e instanceof Error?e.message:String(e))}
+  };
   const saveCurrentTemplate=async()=>{
     if(!threadId||!templateName.trim()||busy)return;
     setSaving(true);setError('');setNotice('');
@@ -202,7 +209,8 @@ export default function CreatePage(){
           {(error||latestError)&&<Paper withBorder p="sm" mb="xs" c="red" role="alert"><Group justify="space-between"><Text size="xs">{error||latestError}</Text>{latestError&&<Button size="xs" variant="light" leftSection={<RotateCcw size={13}/>} onClick={()=>{const last=[...messages].reverse().find(item=>item.role==='user');if(last){setInput(last.content);setAttachment(last.imagePath||'')}}}>恢复上次输入</Button>}</Group></Paper>}
           {attachment&&<Group gap="xs" mb="xs"><img src={attachment} alt="待发送的参考图" className="studio-attachment"/><Text size="xs" c="dimmed">已添加参考图</Text><ActionIcon aria-label="移除附件" size="sm" color="gray" variant="subtle" onClick={()=>setAttachment('')}><X size={15}/></ActionIcon></Group>}
           <Textarea autosize minRows={2} maxRows={5} value={input} disabled={!!busy} onChange={event=>setInput(event.currentTarget.value)} placeholder="例如：直接做 HTML 模板；或生成参考图再转模板；也可以只调亮卡片…" aria-label="向设计 Agent 输入消息" onKeyDown={event=>{if(event.key==='Enter'&&!event.shiftKey&&!event.nativeEvent.isComposing){event.preventDefault();send()}}}/>
-          <Group justify="space-between" mt="sm"><Group gap="xs"><input type="file" accept="image/png,image/jpeg,image/webp" hidden ref={fileRef} onChange={event=>{if(event.target.files?.[0])upload(event.target.files[0]);event.target.value=''}}/><Button size="xs" color="gray" variant="subtle" leftSection={<Paperclip size={15}/>} onClick={()=>fileRef.current?.click()} disabled={!!busy}>上传参考图</Button><Text c="dimmed" size="xs">Enter 发送</Text></Group><Button size="sm" rightSection={<Send size={15}/>} onClick={()=>send()} disabled={!!busy||(!input.trim()&&!attachment)}>发送</Button></Group>
+          <Group justify="space-between" mt="sm"><Group gap="xs"><input type="file" accept="image/png,image/jpeg,image/webp" hidden ref={fileRef} onChange={event=>{if(event.target.files?.[0])upload(event.target.files[0]);event.target.value=''}}/><Button size="xs" color="gray" variant="subtle" leftSection={<Paperclip size={15}/>} onClick={()=>fileRef.current?.click()} disabled={!!busy}>上传参考图</Button><Text c="dimmed" size="xs">Enter 发送</Text></Group>{run?.status==='running'&&<Button size="sm" color="red" variant="light" onClick={stopGeneration}>停止生成</Button>}
+          <Button size="sm" rightSection={<Send size={15}/>} onClick={()=>send()} disabled={!!busy||(!input.trim()&&!attachment)}>发送</Button></Group>
         </div>
       </Paper>
       <Paper withBorder radius="lg" p="lg" className="studio-preview-panel">

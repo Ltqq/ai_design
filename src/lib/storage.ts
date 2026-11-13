@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3';
 import { broadcastStudioEvent } from '@/lib/studio-event-bus';
+import { withTemplateMutation } from '@/lib/task-control';
 import { mkdir, readFile, writeFile, cp, rm } from 'node:fs/promises';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
@@ -107,10 +108,12 @@ export async function duplicateTemplate(id: string) {
 }
 export function renameTemplate(id: string, name: string) { db().prepare('UPDATE templates SET name=? WHERE id=?').run(name,id); }
 export async function deleteTemplate(id: string) {
-  db().prepare('DELETE FROM templates WHERE id=?').run(id);
-  await rm(path.join(dataDir,'templates',id), {recursive:true,force:true});
-  await rm(path.join(dataDir,'versions',id), {recursive:true,force:true});
-  db().prepare('DELETE FROM template_versions WHERE template_id=?').run(id);
+  return withTemplateMutation(id,async()=>{
+    db().prepare('DELETE FROM templates WHERE id=?').run(id);
+    await rm(path.join(dataDir,'templates',id), {recursive:true,force:true});
+    await rm(path.join(dataDir,'versions',id), {recursive:true,force:true});
+    db().prepare('DELETE FROM template_versions WHERE template_id=?').run(id);
+  });
 }
 export async function saveReference(buffer: Buffer, ext: string) {
   const id = randomUUID();
@@ -226,7 +229,7 @@ export function getCurrentStudioRun(threadId:string):StudioRun | null {
   const row=db().prepare('SELECT id FROM studio_runs WHERE session_id=? ORDER BY created_at DESC LIMIT 1').get(threadId) as {id:string}|undefined;
   return row?getStudioRun(row.id):null;
 }
-export function finishStudioRun(runId:string,answer:string,status:'completed'|'failed',error?:string) {
+export function finishStudioRun(runId:string,answer:string,status:'completed'|'failed'|'cancelled',error?:string) {
   const run=getStudioRun(runId)!;
   const database=db();
   database.transaction(()=>{
@@ -250,10 +253,12 @@ export function listTemplateVersions(templateId:string):TemplateVersion[] {
   return rows.map(row=>({id:row.id,templateId:row.template_id,createdAt:row.created_at}));
 }
 export async function restoreTemplateVersion(templateId:string,versionId:string) {
-  const version=db().prepare('SELECT id FROM template_versions WHERE id=? AND template_id=?').get(versionId,templateId);
-  if(!version) throw new Error('模板版本不存在');
-  await snapshotTemplate(templateId);
-  await cp(path.join(dataDir,'versions',templateId,versionId),path.join(dataDir,'templates',templateId),{recursive:true,force:true});
+  return withTemplateMutation(templateId,async()=>{
+    const version=db().prepare('SELECT id FROM template_versions WHERE id=? AND template_id=?').get(versionId,templateId);
+    if(!version) throw new Error('模板版本不存在');
+    await snapshotTemplate(templateId);
+    await cp(path.join(dataDir,'versions',templateId,versionId),path.join(dataDir,'templates',templateId),{recursive:true,force:true});
+  });
 }
 export function savePosterDraft(draft:PosterDraft) {
   db().prepare('INSERT INTO poster_draft(id,content) VALUES(1,?) ON CONFLICT(id) DO UPDATE SET content=excluded.content').run(JSON.stringify(draft));

@@ -17,7 +17,7 @@ type Mode = 'create' | 'patch' | 'redesign' | 'review';
 type CoderInput = {
   prompt:string; mode:Mode; width:number; height:number; previous?:TemplateSource;
   image?:Buffer; assetPath?:string; screenshot?:Buffer; mimeType?:string; reference?:Buffer;
-  runId?:string; onProgress?:(stage:string)=>void;
+  runId?:string; onProgress?:(stage:string)=>void; abortSignal?:AbortSignal;
 };
 
 const designInstructions = `你是专业的商业海报设计师兼前端工程师，拥有当前海报的两个真实本地文件：template.html 和 style.css。
@@ -64,6 +64,7 @@ async function runTemplateCoder(input:CoderInput):Promise<TemplateSource> {
       description:'创建或整体改写一个模板源码文件。生成新模板时分别编写 template.html 和 style.css；只有明确整体重构时才可以覆盖旧文件。',
       inputSchema:z.object({file:nameSchema,content:z.string()}),
       execute:async ({file,content}:{file:FileName;content:string})=>{
+        input.abortSignal?.throwIfAborted();
         await writeFile(path.join(folder,file),content);
         changed=true;
         input.onProgress?.(`已编写 ${file}`);
@@ -75,6 +76,7 @@ async function runTemplateCoder(input:CoderInput):Promise<TemplateSource> {
       description:'精确修改一个现有 HTML/CSS 文件，只替换唯一匹配的旧片段，保持其他代码不动；适合调整局部版式和样式。',
       inputSchema:z.object({file:nameSchema,oldText:z.string().min(1),newText:z.string()}),
       execute:async ({file,oldText,newText}:{file:FileName;oldText:string;newText:string})=>{
+        input.abortSignal?.throwIfAborted();
         const previous=await readSource();
         const key=file==='template.html'?'html':'css';
         const next=applyTemplateEdits(previous,[{file:key,oldText,newText}]);
@@ -125,10 +127,11 @@ async function runTemplateCoder(input:CoderInput):Promise<TemplateSource> {
       {type:'text',text:'下一张是最初参考图，保留其中仍符合用户要求的视觉特征。'},
       {type:'file',data:input.reference.toString('base64'),mediaType:input.mimeType||'image/png'});
     const started=Date.now();
-    const result=await agent.generate([{role:'user',content}],{maxSteps:8,toolCallConcurrency:1});
+    const result=await agent.generate([{role:'user',content}],{maxSteps:8,toolCallConcurrency:1,abortSignal:input.abortSignal});
     recordModelUsage({runId:input.runId,kind:'vision',
       operation:isCreate?'template-create':input.mode==='review'?'template-visual-review':isPatch?'template-patch':'template-redesign',
       modelId:config.modelId,usage:result.usage,durationMs:Date.now()-started});
+    input.abortSignal?.throwIfAborted();
     if(!changed)throw new Error('模板模型未调用文件编辑工具，源码未发生变化');
     const source=sourceSchema.parse(await readSource());
     input.onProgress?.(inspected?'浏览器预览完成，等待用户确认':'源码已编写，正在生成预览');

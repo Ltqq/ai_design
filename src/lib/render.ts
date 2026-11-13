@@ -7,6 +7,7 @@ export async function renderPNG(source:TemplateSource, data:Record<string,unknow
   const browser = await chromium.launch({ headless: true });
   try {
     const page = await browser.newPage({ viewport: {width:source.manifest.width, height:source.manifest.height}, deviceScaleFactor: 1, javaScriptEnabled:false });
+    await page.route('**/*',route=>route.abort());
     let html=renderHTML(source,data);
     // Screenshot pages have no HTTP origin; inline only existing local reference assets.
     const assets=new Set(html.match(/\/api\/assets\/references\/[a-f0-9-]{36}\.(?:png|jpe?g|webp)/g)||[]);

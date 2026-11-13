@@ -6,7 +6,7 @@ import { generateDesignImage, convertDesignToTemplate, createTemplateFromText, r
 import { renameTemplate, saveDraft } from '@/lib/storage';
 import type { StudioState } from '@/types';
 
-export function designStudioAgent(design: StudioState, onUpdate?: (stage:string)=>void,runId?:string,allowRedesign=false) {
+export function designStudioAgent(design: StudioState, onUpdate?: (stage:string)=>void,runId?:string,allowRedesign=false,signal?:AbortSignal) {
   const { config, provider } = configuredModel('vision');
   const tools = {
     createTemplateFromText: createTool({
@@ -14,7 +14,7 @@ export function designStudioAgent(design: StudioState, onUpdate?: (stage:string)
       description:'直接按文字生成可复用 HTML/CSS 模板，不需要生成参考图片。用户没有提供参考图、只说要一个海报模板时优先调用此工具，省下生图和多模态图片理解费用。',
       inputSchema:z.object({prompt:z.string().min(3)}),
       execute:async ({prompt}:{prompt:string})=>{
-        const result=await createTemplateFromText(prompt,design.width,design.height,onUpdate,runId);
+        const result=await createTemplateFromText(prompt,design.width,design.height,onUpdate,runId,signal);
         design.draftId=result.draftId;design.templateId='';design.referencePath='';
         onUpdate?.('文字 HTML 模板已生成');
         return {success:true,draftId:result.draftId,preview:result.preview,fields:result.manifest.fields};
@@ -26,10 +26,8 @@ export function designStudioAgent(design: StudioState, onUpdate?: (stage:string)
       inputSchema: z.object({ prompt: z.string().min(3).describe('海报的视觉风格和构图要求') }),
       execute: async ({ prompt }: { prompt: string }) => {
         onUpdate?.('AI 正在生成参考海报');
-        const referencePath = await generateDesignImage(prompt,runId,design.width,design.height);
+        const referencePath = await generateDesignImage(prompt,runId,design.width,design.height,signal);
         design.referencePath = referencePath;
-        design.draftId = '';
-        design.templateId = '';
         onUpdate?.('参考海报已生成');
         return { referencePath, message: '参考图片已生成，可直接继续转成模板。' };
       },
@@ -40,7 +38,7 @@ export function designStudioAgent(design: StudioState, onUpdate?: (stage:string)
       inputSchema: z.object({ instructions: z.string().describe('希望保留的布局、风格和可填充区域') }),
       execute: async ({ instructions }: { instructions: string }) => {
         if (!design.referencePath) return { success: false, message: '请先上传参考图片，或让我生成一张海报。' };
-        const result = await convertDesignToTemplate(design.referencePath, instructions, design.width, design.height, onUpdate,runId);
+        const result = await convertDesignToTemplate(design.referencePath, instructions, design.width, design.height, onUpdate,runId,signal);
         design.draftId = result.draftId;
         design.templateId = '';
         onUpdate?.('HTML 模板已生成并保存草稿');
@@ -55,7 +53,7 @@ export function designStudioAgent(design: StudioState, onUpdate?: (stage:string)
         const kind = design.templateId ? 'templates' : 'drafts';
         const id = design.templateId || design.draftId;
         if (!id) return { success: false, message: '目前还没有 HTML 模板，请先把图片转换成模板。' };
-        const result = await reviseDesignTemplate(kind, id, instruction, onUpdate, 'patch',undefined,runId);
+        const result = await reviseDesignTemplate(kind, id, instruction, onUpdate, 'patch',undefined,runId,signal);
         onUpdate?.('模板修改已完成');
         return { success: true, editMode:'patch', changedFiles:result.changedFiles, preview: result.preview, fields: result.manifest.fields };
       },
@@ -68,7 +66,7 @@ export function designStudioAgent(design: StudioState, onUpdate?: (stage:string)
         const kind=design.templateId?'templates':'drafts';
         const id=design.templateId||design.draftId;
         if(!id)return {success:false,message:'当前还没有 HTML 模板可检查'};
-        const result=await reviseDesignTemplate(kind,id,instruction,onUpdate,'review',design.referencePath,runId);
+        const result=await reviseDesignTemplate(kind,id,instruction,onUpdate,'review',design.referencePath,runId,signal);
         onUpdate?.('已根据实际渲染截图局部修正模板');
         return {success:true,editMode:'review',changedFiles:result.changedFiles,preview:result.preview};
       },
@@ -82,7 +80,7 @@ export function designStudioAgent(design: StudioState, onUpdate?: (stage:string)
         const kind=design.templateId?'templates':'drafts';
         const id=design.templateId||design.draftId;
         if(!id)return {success:false,message:'请先生成 HTML 模板'};
-        const result=await reviseDesignTemplate(kind,id,instruction,onUpdate,'redesign',design.referencePath,runId);
+        const result=await reviseDesignTemplate(kind,id,instruction,onUpdate,'redesign',design.referencePath,runId,signal);
         onUpdate?.('模板整体重构已完成');
         return {success:true,editMode:'redesign',preview:result.preview};
       },

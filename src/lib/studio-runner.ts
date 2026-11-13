@@ -1,4 +1,5 @@
 import { designStudioAgent } from '@/mastra/agents/design-studio';
+import { registerStudioRun, releaseStudioRun } from '@/lib/task-control';
 import { getConfig } from '@/lib/storage';
 import { recordModelUsage } from '@/lib/model-usage';
 import { beginStudioRun, finishStudioRun, getChat, getStudioState, recordStudioEvent, referenceBytes, saveStudioState } from '@/lib/storage';
@@ -12,8 +13,9 @@ export function startStudioRun(input:ChatInput) {
   if(input.width) design.width=input.width;
   if(input.height) design.height=input.height;
   const run=beginStudioRun(input.threadId,input.message,input.imagePath||null,design);
-  // This promise belongs to the long-lived single-instance Node process, not the SSE connection.
-  void executeStudioRun(run.runId,run.threadId,design);
+  const controller = new AbortController();
+  registerStudioRun(run.runId, controller);
+  void executeStudioRun(run.runId, run.threadId, design, controller);
   return {...run,design:studioView(design)};
 }
 
@@ -25,7 +27,10 @@ export function studioView(design:StudioState) {
   };
 }
 
-async function executeStudioRun(runId:string,threadId:string,design:StudioState) {
+async function executeStudioRun(runId:string,threadId:string,design:StudioState,controller:AbortController) {
+  const signal = controller.signal;
+  const timeout = setTimeout(() => controller.abort(new Error('任务执行超时')), 300_000);
+  timeout.unref();
   let answer='';
   let pendingText='';
   let pendingReasoning='';
@@ -62,7 +67,7 @@ async function executeStudioRun(runId:string,threadId:string,design:StudioState)
     }
     recordStudioEvent(runId,'progress',{stage:'Agent 正在理解需求',design:studioView(design)});
     const agentStarted=Date.now();
-    const output=await designStudioAgent(design,onUpdate,runId,/整体|整张|全部|彻底|从头|重构|重新设计/.test(history.at(-1)?.content||'')).stream(messages,{maxSteps:7,toolCallConcurrency:1});
+    const output=await designStudioAgent(design,onUpdate,runId,/(?:^|[，。\s])(?:整体重构|完全重新设计|彻底换风格|从头制作)/.test(history.at(-1)?.content||''),signal).stream(messages,{maxSteps:7,toolCallConcurrency:1,abortSignal:signal});
     for await(const raw of output.fullStream){
       const chunk=raw as {type:string;payload?:{text?:string;toolName?:string;toolCallId?:string;error?:unknown;usage?:unknown};textDelta?:string};
       if(chunk.type==='text-delta'){
@@ -86,6 +91,7 @@ async function executeStudioRun(runId:string,threadId:string,design:StudioState)
       }
     }
     flush();
+    signal.throwIfAborted();
     if(output.error)throw new Error(typeof output.error==='string'?output.error:output.error instanceof Error?output.error.message:JSON.stringify(output.error));
     const usage=await output.usage;
     if(usage)recordModelUsage({runId,kind:'vision',operation:'agent-routing',modelId:getConfig('vision')?.modelId||'unknown',usage,durationMs:Date.now()-agentStarted});
@@ -96,8 +102,12 @@ async function executeStudioRun(runId:string,threadId:string,design:StudioState)
     flush();
     saveStudioState(threadId,design);
     const message=error instanceof Error?error.message:String(error);
-    finishStudioRun(runId,answer.trim(),'failed',message);
-    recordStudioEvent(runId,'finished',{status:'failed',error:message,design:studioView(design)});
-    console.error('Studio Agent run failed:',message);
+    const status=signal.aborted?'cancelled':'failed';
+    finishStudioRun(runId,answer.trim(),status,signal.aborted?'生成已停止':message);
+    recordStudioEvent(runId,'finished',{status,error:signal.aborted?'生成已停止':message,design:studioView(design)});
+    if(!signal.aborted)console.error('Studio Agent run failed:',message);
+  } finally {
+    clearTimeout(timeout);
+    releaseStudioRun(runId);
   }
 }

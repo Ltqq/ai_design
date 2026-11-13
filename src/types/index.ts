@@ -19,7 +19,7 @@ export type ChatMessage = { id: string; role: 'user'|'assistant'; content: strin
 
 export type StudioState = { referencePath:string; draftId:string; templateId:string; width:number; height:number };
 
-export type StudioRun = {id:string;threadId:string;status:'running'|'completed'|'failed'|'interrupted';error:string|null;createdAt:string;finishedAt:string|null};
+export type StudioRun = {id:string;threadId:string;status:'running'|'completed'|'failed'|'interrupted'|'cancelled';error:string|null;createdAt:string;finishedAt:string|null};
 export type StudioEvent = {id:number;runId:string;type:string;payload:Record<string,unknown>;createdAt:string};
 export type TemplateVersion = {id:string;templateId:string;createdAt:string};
 export type PosterDraft = {templateId:string;selectedNames:string[];fixedFields:Record<string,string>};
