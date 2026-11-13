@@ -2,6 +2,8 @@ import { Agent } from '@mastra/core/agent';
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 import { configuredModel } from '@/lib/model-provider';
+import { studioMemory } from '@/lib/agent-memory';
+import { TokenLimiter } from '@mastra/core/processors';
 import { generateDesignImage, convertDesignToTemplate, createTemplateFromText, reviseDesignTemplate } from '@/lib/design-operations';
 import { renameTemplate, saveDraft } from '@/lib/storage';
 import type { StudioState } from '@/types';
@@ -102,6 +104,8 @@ export function designStudioAgent(design: StudioState, onUpdate?: (stage:string)
     id: 'poster-design-studio',
     name: 'AI 海报设计师',
     model: provider.chatModel(config.modelId),
+    memory:studioMemory(),
+    inputProcessors:[new TokenLimiter(60_000)],
     instructions: `你是 AI Design 的海报创作 Agent，你不仅可以给建议，还能调用工具真正完成设计操作。
 当前工作状态：${JSON.stringify(design)}。
 用户没有参考图而想直接制作可复用海报模板时，优先使用 createTemplateFromText，不要浪费一次生图。用户明确要求先生成参考图才调用 generateImage；参考图转模板用 convertToTemplate。默认用 reviseTemplate 对 HTML/CSS 做局部修改，不重新生成整份源码。用户要求视觉检查或对比参考图微调时使用 reviewTemplate（截图+局部补丁，只有明确要求才调用，避免额外计费）。只有用户明确要求全新风格、整体重构才使用 redesignTemplate。用户只要说调整颜色、样式、局部位置、间距、排版，不要选整体重构。局部编辑无法精准定位时直接提示失败并继续澄清，禁止自动改用整体重构。用户明确要求保存才调用 saveTemplate。首次模板生成后只做本地渲染，不自动发起第二次视觉精修。

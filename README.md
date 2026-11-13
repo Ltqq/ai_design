@@ -149,3 +149,15 @@ GitHub Actions 运行上述检查以及浏览器页面冒烟测试；实际上�
 模板模型现在通过 Mastra `readFile / writeFile / editFile` 工具操作隔离的真实 HTML/CSS 工作文件，不再要求一次性生成包含完整 HTML/CSS/manifest 的 JSON。首次创作分别写 `template.html`、`style.css`；`manifest.json` 保持由应用管理，模型仍需真实使用 `{{#each items}}`、`{{name}}` 和 `{{discount}}`。文件工具只能操作当前模板的两个源码文件。
 
 修改现有模板时，模型会收到 Playwright 当前预览的真实截图，并通过 `readFile` 理解现有代码、`editFile` 进行精确片段编辑。工作副本校验和渲染成功后才提交到原模板；用户每次看预览后自行决定是否继续修改或重新生图。可选 `renderPreview` 工具支持模型按需查看本次工作区的真实浏览器截图，不强制自动循环。
+
+
+## Agent 任务与上下文
+
+创作 Agent 使用 Mastra Memory（存放在现有 `data/ai-design.sqlite`）保留当前会话上下文；
+旧消息由 Mastra Observational Memory 按需提炼，TokenLimiter 在发送模型前限制上下文体积。
+已有聊天记录仍由原 SQLite 表提供 UI 展示，升级前的历史对话不会自动迁入 Mastra Memory，
+但原对话内容、模板与参考图不会删除。模板代码 Agent 每次从当前源码开始，不共享聊天记忆。
+
+创作中的「停止生成」会中断模型和工具调用，最后一次成功保存的模板保持不变；
+切换页面或关闭网页仅断开事件订阅，不停止后台任务。模板修改中禁止同时删除、恢复或再次修改。
+服务重启后未完成任务标记为中断，不从模型输出中途自动恢复。

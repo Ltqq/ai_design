@@ -1,4 +1,5 @@
 import { Agent } from '@mastra/core/agent';
+import { TokenLimiter } from '@mastra/core/processors';
 import { createTool } from '@mastra/core/tools';
 import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
 import os from 'node:os';
@@ -109,6 +110,7 @@ async function runTemplateCoder(input:CoderInput):Promise<TemplateSource> {
       id:'poster-file-coder',name:'海报文件编写 Agent',
       model:provider.chatModel(config.modelId),
       instructions:designInstructions,
+      inputProcessors:[new TokenLimiter(60_000)],
       tools,
     });
     const request=isCreate
@@ -133,7 +135,21 @@ async function runTemplateCoder(input:CoderInput):Promise<TemplateSource> {
       modelId:config.modelId,usage:result.usage,durationMs:Date.now()-started});
     input.abortSignal?.throwIfAborted();
     if(!changed)throw new Error('模板模型未调用文件编辑工具，源码未发生变化');
-    const source=sourceSchema.parse(await readSource());
+    let source:TemplateSource;
+    try {
+      source=sourceSchema.parse(await readSource());
+    } catch(error) {
+      input.abortSignal?.throwIfAborted();
+      const message=error instanceof Error?error.message:String(error);
+      input.onProgress?.('生成的模板未通过字段校验，正在根据错误修复一次');
+      const repaired=await agent.generate([{
+        role:'user',
+        content:`刚写入的模板未通过外部模型输出校验：${message}。请读取相关文件，直接修改缺失或错误的 HTML/CSS；不要改变设计风格。只修复校验错误。`
+      }],{maxSteps:4,toolCallConcurrency:1,abortSignal:input.abortSignal});
+      recordModelUsage({runId:input.runId,kind:'vision',operation:'template-repair',modelId:config.modelId,usage:repaired.usage,durationMs:0});
+      input.abortSignal?.throwIfAborted();
+      source=sourceSchema.parse(await readSource());
+    }
     input.onProgress?.(inspected?'浏览器预览完成，等待用户确认':'源码已编写，正在生成预览');
     return source;
   } finally {

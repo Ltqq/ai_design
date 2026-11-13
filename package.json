@@ -25,7 +25,9 @@
     "ai": "^6.0.0",
     "zod": "^4.0.0",
     "@mantine/core": "^8.3.0",
-    "@mantine/hooks": "^8.3.0"
+    "@mantine/hooks": "^8.3.0",
+    "@mastra/memory": "^1.41.0",
+    "@mastra/libsql": "^1.29.0"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",

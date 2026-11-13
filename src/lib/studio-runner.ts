@@ -51,23 +51,16 @@ async function executeStudioRun(runId:string,threadId:string,design:StudioState,
     recordStudioEvent(runId,'progress',{stage,design:studioView(design)});
   };
   try {
-    // Old images remain in SQLite, but only the latest image is sent with the current request.
-    const history=getChat(threadId).slice(-12);
-    const messages:Array<{role:'assistant';content:string}|{role:'user';content:string|Array<{type:'text';text:string}|{type:'file';data:string;mediaType:string}>}>=[];
-    for(let index=0;index<history.length;index++) {
-      const item=history[index];
-      if(item.role==='assistant'){messages.push({role:'assistant',content:item.content});continue;}
-      if(index===history.length-1 && item.imagePath){
-        const bytes=await referenceBytes(item.imagePath);
-        messages.push({role:'user',content:[
-          {type:'text',text:item.content},
-          {type:'file',data:bytes.toString('base64'),mediaType:item.imagePath.endsWith('.png')?'image/png':item.imagePath.endsWith('.webp')?'image/webp':'image/jpeg'},
-        ]});
-      }else messages.push({role:'user',content:item.content});
-    }
+    const current=getChat(threadId).at(-1)!;
+    const content=current.imagePath?[
+      {type:'text' as const,text:current.content},
+      {type:'file' as const,data:(await referenceBytes(current.imagePath)).toString('base64'),
+        mediaType:current.imagePath.endsWith('.png')?'image/png':current.imagePath.endsWith('.webp')?'image/webp':'image/jpeg'},
+    ]:current.content;
+    const messages=[{role:'user' as const,content}];
     recordStudioEvent(runId,'progress',{stage:'Agent 正在理解需求',design:studioView(design)});
     const agentStarted=Date.now();
-    const output=await designStudioAgent(design,onUpdate,runId,/(?:^|[，。\s])(?:整体重构|完全重新设计|彻底换风格|从头制作)/.test(history.at(-1)?.content||''),signal).stream(messages,{maxSteps:7,toolCallConcurrency:1,abortSignal:signal});
+    const output=await designStudioAgent(design,onUpdate,runId,/(?:^|[，。\s])(?:整体重构|完全重新设计|彻底换风格|从头制作)/.test(current.content),signal).stream(messages,{maxSteps:7,toolCallConcurrency:1,abortSignal:signal,memory:{resource:'ai-design-local',thread:threadId}});
     for await(const raw of output.fullStream){
       const chunk=raw as {type:string;payload?:{text?:string;toolName?:string;toolCallId?:string;error?:unknown;usage?:unknown};textDelta?:string};
       if(chunk.type==='text-delta'){
