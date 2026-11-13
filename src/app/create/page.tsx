@@ -180,7 +180,7 @@ export default function CreatePage(){
       <Paper withBorder radius="lg" p={0} className="studio-chat">
         <Group justify="space-between" px="lg" py="md" className="studio-chat-top">
           <Group gap="xs"><span className="studio-agent-icon"><Sparkles size={18}/></span><div><Text fw={750} size="sm">海报设计 Agent</Text><Text size="xs" c="dimmed">Mastra · 真实工具执行时间线</Text></div></Group>
-          <Badge color={busy?'yellow':latestError?'red':'teal'} variant="light">{busy?'运行中 · 切页不中断':latestError?'需要处理':'就绪'}</Badge>
+          <Badge color={busy?'yellow':latestError?'red':'teal'} variant="light">{busy?'运行中 · 切页不中断':run?.status==='cancelled'?'已停止':latestError?'需要处理':'就绪'}</Badge>
         </Group>
         <ScrollArea className="studio-messages" viewportRef={scrollRef}>
           {messages.length?<Stack gap="lg" p="lg">{messages.map(item=><div key={item.id} className={`studio-message ${item.role}`}>

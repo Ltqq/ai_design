@@ -3,6 +3,7 @@ import { mkdtemp,readFile,rm,stat,utimes } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { withTemplateMutation } from '../lib/task-control';
 
 describe('SQLite 和模板真实持久化',()=>{
   it('模板、模型表、对话和导出历史能保存及读取',async()=>{
@@ -69,6 +70,13 @@ describe('SQLite 和模板真实持久化',()=>{
       expect(entry.estimatedCostCny).toBeCloseTo((400*2+600*1+400*8)/1_000_000);
       usage.recordModelUsage({kind:'image',operation:'image-generate',modelId:'test-image',imageCount:1,durationMs:10});
       expect(usage.listModelUsage(1)[0].estimatedCostCny).toBeNull();
+      let release!:()=>void;
+      const edit=withTemplateMutation(id,()=>new Promise<void>(resolve=>{release=resolve}));
+      await expect(storage.deleteTemplate(id)).rejects.toThrow('正在被修改');
+      await expect(storage.restoreTemplateVersion(id,version.id)).rejects.toThrow('正在被修改');
+      expect((await storage.readSource('templates',id)).css).toBe('h1{color:orange}');
+      release();
+      await edit;
       storage.deleteChat(threadId);
       expect(storage.getStudioState(threadId)).toEqual({referencePath:'',draftId:'',templateId:'',width:1080,height:1440});
       expect(storage.getChat(threadId)).toHaveLength(0);

@@ -82,7 +82,7 @@ npm run backup
 
 ## 模型接口约定
 
-- **多模态理解**：OpenAI Chat Completions 兼容接口，支持图片输入。图片转模板通过 Mastra Agent 和 Workflow 调用，模型返回标准 HTML/CSS/manifest JSON。
+- **多模态理解**：OpenAI Chat Completions 兼容接口，支持图片输入。图片转模板通过 Mastra Agent 的受限文件工具写入 HTML/CSS，manifest 由程序维护。
 - **图片生成**：OpenAI 兼容图片生成接口；不是所有中转上游都支持这个接口。
 - **对话式创作**：多模态理解模型通过 Mastra Tools 调用现有生图、转换、修改和保存流程；同一会话的消息与设计状态保存在 SQLite。
 - 无 API Key 时仍可使用已经保存的模板、导入 Excel 和离线 PNG 渲染。AI 流程需要实际可用的上游模型。
@@ -102,7 +102,7 @@ GitHub Actions 运行上述检查以及浏览器页面冒烟测试；实际上�
 ## 项目说明
 
 - `src/app`：页面与 API
-- `src/mastra`：Mastra 模板 Agent / Workflow
+- `src/mastra`：Mastra 模板 Agent 与受限文件工具
 - `src/lib`：Excel 解析、Handlebars、SQLite、Playwright
 - `scripts/backup.mjs`：手动备份
 - `docs`：需求和技术文档
