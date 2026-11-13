@@ -42,7 +42,8 @@ const modelServer = createServer(async (request,response)=>{
   }
   const latest=[...(payload.messages||[])].reverse().find(m=>m.role==='user');
   const userText=JSON.stringify(latest?.content||'');
-  const hasToolReply=payload.messages?.some(m=>m.role==='tool');
+  const currentTurnStart=(payload.messages||[]).findLastIndex(m=>m.role==='user');
+  const hasToolReply=(payload.messages||[]).slice(currentTurnStart+1).some(m=>m.role==='tool');
   const toolNames=(payload.tools||[]).map(t=>t.function?.name||'');
   const codingTool=toolNames.includes('writeFile')||toolNames.includes('editFile');
   if(codingTool&&!hasToolReply){
