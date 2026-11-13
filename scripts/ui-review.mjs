@@ -279,7 +279,7 @@ try {
   await page.getByRole('textbox',{name:'向设计 Agent 输入消息'}).fill('流式演示：测试停止生成');
   await page.getByRole('button',{name:'发送'}).click();
   await page.getByText('实时输出第一段',{exact:false}).waitFor({timeout:9000});
-  await page.getByRole('button',{name:'停止生成'}).click();
+  await page.getByRole('button',{name:'停止生成',exact:true}).click();
   await page.getByText('已停止',{exact:true}).waitFor({timeout:15000});
   releaseDemoStream();
   console.log('UI stop → real Agent AbortSignal → cancelled task ✓');
